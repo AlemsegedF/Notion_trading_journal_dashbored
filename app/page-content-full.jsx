@@ -101,6 +101,50 @@ export default function TradingDashboard() {
     fetchTrades();
   }, []);
 
+  // CALL ALL HOOKS FIRST - before any conditional returns!
+  const wins      = trades.filter(t=>t.outcome==="Win");
+  const losses    = trades.filter(t=>t.outcome==="Loss");
+  const winRate   = trades.length > 0 ? Math.round(wins.length/trades.length*100) : 0;
+  const totalPnL  = trades.reduce((s,t)=>s+t.pnl,0);
+  const avgR      = trades.length > 0 ? +(trades.reduce((s,t)=>s+t.rMultiple,0)/trades.length).toFixed(2) : 0;
+  const avgWinR   = wins.length > 0 ? +(wins.reduce((s,t)=>s+t.rMultiple,0)/wins.length).toFixed(2) : 0;
+  const avgLossR  = losses.length > 0 ? +(Math.abs(losses.reduce((s,t)=>s+t.rMultiple,0)/losses.length)).toFixed(2) : 0;
+  const expectancy= +((winRate/100*avgWinR)-((100-winRate)/100*avgLossR)).toFixed(3);
+  const profFactor= wins.length > 0 && losses.length > 0 ? +(wins.reduce((s,t)=>s+t.pnl,0)/Math.abs(losses.reduce((s,t)=>s+t.pnl,0))).toFixed(2) : 0;
+  const violations= trades.filter(t=>!t.sopOk).length;
+  const equity    = computeEquityCurve(trades);
+
+  const monthlyData = useMemo(()=>{
+    try {
+      const m = {};
+      trades.filter(t=>t.date).forEach(t=>{ const k=month(t.date); if(!m[k]) m[k]={month:k,pnl:0,trades:0,wins:0}; m[k].pnl+=t.pnl; m[k].trades++; if(t.outcome==="Win") m[k].wins++; });
+      return Object.values(m).map(v=>({...v, winRate:v.trades>0?Math.round(v.wins/v.trades*100):0}));
+    } catch(e) { console.error("monthlyData:",e); return []; }
+  },[trades]);
+
+  const weeklyData = useMemo(()=>{
+    try {
+      const w = {};
+      trades.filter(t=>t.date).forEach(t=>{ const k=week(t.date); if(!w[k]) w[k]={week:k,pnl:0,trades:0,wins:0}; w[k].pnl+=t.pnl; w[k].trades++; if(t.outcome==="Win") w[k].wins++; });
+      return Object.values(w).map(v=>({...v,winRate:v.trades>0?Math.round(v.wins/v.trades*100):0}));
+    } catch(e) { console.error("weeklyData:",e); return []; }
+  },[trades]);
+
+  const byPair  = useMemo(()=>{ try { return groupBy(trades,t=>t.pair); } catch(e) { console.error("byPair:",e); return []; } },[trades]);
+  const bySetup = useMemo(()=>{ try { return groupBy(trades,t=>t.setup); } catch(e) { console.error("bySetup:",e); return []; } },[trades]);
+  const bySess  = useMemo(()=>{ try { return groupBy(trades,t=>t.session); } catch(e) { console.error("bySess:",e); return []; } },[trades]);
+
+  const radarDat = bySetup.length>0 ? bySetup.map(s=>({ setup: (s.label||"N/A").replace(" Entry","").replace("Liquidity Sweep","Liq.Sweep"), winRate: s.winRate||0, avgR: (s.avgR||0)*25 })) : [];
+
+  const pieDat = [
+    { name:"Wins", value: wins.length, color: C.green },
+    { name:"Losses", value: losses.length, color: C.red },
+    { name:"Breakeven", value: trades.filter(t=>t.outcome==="Breakeven").length, color: C.muted },
+  ];
+
+  const tabs = ["overview","equity","pairs","setups","weekly","monthly"];
+
+  // NOW render with conditional UI based on state
   if (loading) {
     return (
       <div style={{ background: C.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: C.text }}>
@@ -127,51 +171,6 @@ export default function TradingDashboard() {
       </div>
     );
   }
-
-  // COMPUTED
-  const wins      = trades.filter(t=>t.outcome==="Win");
-  const losses    = trades.filter(t=>t.outcome==="Loss");
-  const winRate   = trades.length > 0 ? Math.round(wins.length/trades.length*100) : 0;
-  const totalPnL  = trades.reduce((s,t)=>s+t.pnl,0);
-  const avgR      = trades.length > 0 ? +(trades.reduce((s,t)=>s+t.rMultiple,0)/trades.length).toFixed(2) : 0;
-  const avgWinR   = wins.length > 0 ? +(wins.reduce((s,t)=>s+t.rMultiple,0)/wins.length).toFixed(2) : 0;
-  const avgLossR  = losses.length > 0 ? +(Math.abs(losses.reduce((s,t)=>s+t.rMultiple,0)/losses.length)).toFixed(2) : 0;
-  const expectancy= +((winRate/100*avgWinR)-((100-winRate)/100*avgLossR)).toFixed(3);
-  const profFactor= wins.length > 0 && losses.length > 0 ? +(wins.reduce((s,t)=>s+t.pnl,0)/Math.abs(losses.reduce((s,t)=>s+t.pnl,0))).toFixed(2) : 0;
-  const violations= trades.filter(t=>!t.sopOk).length;
-  const equity    = computeEquityCurve(trades);
-
-  // Monthly PnL
-  const monthlyData = useMemo(()=>{
-    try {
-      const m = {};
-      trades.filter(t=>t.date).forEach(t=>{ const k=month(t.date); if(!m[k]) m[k]={month:k,pnl:0,trades:0,wins:0}; m[k].pnl+=t.pnl; m[k].trades++; if(t.outcome==="Win") m[k].wins++; });
-      return Object.values(m).map(v=>({...v, winRate:v.trades>0?Math.round(v.wins/v.trades*100):0}));
-    } catch(e) { console.error("monthlyData:",e); return []; }
-  },[trades]);
-
-  // Weekly PnL
-  const weeklyData = useMemo(()=>{
-    try {
-      const w = {};
-      trades.filter(t=>t.date).forEach(t=>{ const k=week(t.date); if(!w[k]) w[k]={week:k,pnl:0,trades:0,wins:0}; w[k].pnl+=t.pnl; w[k].trades++; if(t.outcome==="Win") w[k].wins++; });
-      return Object.values(w).map(v=>({...v,winRate:v.trades>0?Math.round(v.wins/v.trades*100):0}));
-    } catch(e) { console.error("weeklyData:",e); return []; }
-  },[trades]);
-
-  const byPair  = useMemo(()=>{ try { return groupBy(trades,t=>t.pair); } catch(e) { console.error("byPair:",e); return []; } },[trades]);
-  const bySetup = useMemo(()=>{ try { return groupBy(trades,t=>t.setup); } catch(e) { console.error("bySetup:",e); return []; } },[trades]);
-  const bySess  = useMemo(()=>{ try { return groupBy(trades,t=>t.session); } catch(e) { console.error("bySess:",e); return []; } },[trades]);
-
-  const radarDat = bySetup.length>0 ? bySetup.map(s=>({ setup: (s.label||"N/A").replace(" Entry","").replace("Liquidity Sweep","Liq.Sweep"), winRate: s.winRate||0, avgR: (s.avgR||0)*25 })) : [];
-
-  const pieDat = [
-    { name:"Wins", value: wins.length, color: C.green },
-    { name:"Losses", value: losses.length, color: C.red },
-    { name:"Breakeven", value: trades.filter(t=>t.outcome==="Breakeven").length, color: C.muted },
-  ];
-
-  const tabs = ["overview","equity","pairs","setups","weekly","monthly"];
 
   return (
     <div style={{ background: C.bg, minHeight:"100vh", fontFamily:"'DM Sans', sans-serif", color: C.text, padding:"0 0 40px" }}>
