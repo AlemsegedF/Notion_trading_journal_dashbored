@@ -143,23 +143,27 @@ export default function TradingDashboard() {
 
   // Monthly PnL
   const monthlyData = useMemo(()=>{
-    const m = {};
-    trades.forEach(t=>{ const k=month(t.date); if(!m[k]) m[k]={month:k,pnl:0,trades:0,wins:0}; m[k].pnl+=t.pnl; m[k].trades++; if(t.outcome==="Win") m[k].wins++; });
-    return Object.values(m).map(v=>({...v, winRate:Math.round(v.wins/v.trades*100)}));
+    try {
+      const m = {};
+      trades.filter(t=>t.date).forEach(t=>{ const k=month(t.date); if(!m[k]) m[k]={month:k,pnl:0,trades:0,wins:0}; m[k].pnl+=t.pnl; m[k].trades++; if(t.outcome==="Win") m[k].wins++; });
+      return Object.values(m).map(v=>({...v, winRate:v.trades>0?Math.round(v.wins/v.trades*100):0}));
+    } catch(e) { console.error("monthlyData:",e); return []; }
   },[trades]);
 
   // Weekly PnL
   const weeklyData = useMemo(()=>{
-    const w = {};
-    trades.forEach(t=>{ const k=week(t.date); if(!w[k]) w[k]={week:k,pnl:0,trades:0,wins:0}; w[k].pnl+=t.pnl; w[k].trades++; if(t.outcome==="Win") w[k].wins++; });
-    return Object.values(w).map(v=>({...v,winRate:Math.round(v.wins/v.trades*100)}));
+    try {
+      const w = {};
+      trades.filter(t=>t.date).forEach(t=>{ const k=week(t.date); if(!w[k]) w[k]={week:k,pnl:0,trades:0,wins:0}; w[k].pnl+=t.pnl; w[k].trades++; if(t.outcome==="Win") w[k].wins++; });
+      return Object.values(w).map(v=>({...v,winRate:v.trades>0?Math.round(v.wins/v.trades*100):0}));
+    } catch(e) { console.error("weeklyData:",e); return []; }
   },[trades]);
 
-  const byPair  = useMemo(()=>groupBy(trades,t=>t.pair),[trades]);
-  const bySetup = useMemo(()=>groupBy(trades,t=>t.setup),[trades]);
-  const bySess  = useMemo(()=>groupBy(trades,t=>t.session),[trades]);
+  const byPair  = useMemo(()=>{ try { return groupBy(trades,t=>t.pair); } catch(e) { console.error("byPair:",e); return []; } },[trades]);
+  const bySetup = useMemo(()=>{ try { return groupBy(trades,t=>t.setup); } catch(e) { console.error("bySetup:",e); return []; } },[trades]);
+  const bySess  = useMemo(()=>{ try { return groupBy(trades,t=>t.session); } catch(e) { console.error("bySess:",e); return []; } },[trades]);
 
-  const radarDat = bySetup.map(s=>({ setup: s.label.replace(" Entry","").replace("Liquidity Sweep","Liq.Sweep"), winRate: s.winRate, avgR: s.avgR*25 }));
+  const radarDat = bySetup.length>0 ? bySetup.map(s=>({ setup: (s.label||"N/A").replace(" Entry","").replace("Liquidity Sweep","Liq.Sweep"), winRate: s.winRate||0, avgR: (s.avgR||0)*25 })) : [];
 
   const pieDat = [
     { name:"Wins", value: wins.length, color: C.green },
