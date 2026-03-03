@@ -8,7 +8,7 @@
  * - External trading platform APIs
  */
 
-import { User, Trade, Strategy, UserPlan, TradeDirection, TradeOutcome } from '../types';
+import { User, Trade, Strategy, EquityCurvePoint, UserPlan, TradeDirection, TradeOutcome } from '../types';
 
 // ─── MOCK USER ───────────────────────────────────────────────────────────────
 
@@ -351,7 +351,7 @@ export function calculateAvgTradeDuration(trades: Trade[]): string {
 /**
  * Generates equity curve data points
  */
-export function generateEquityCurve(trades: Trade[], startingCapital: number = 50000): { date: Date; balance: number; pnl: number }[] {
+export function generateEquityCurve(trades: Trade[], startingCapital: number = 50000): EquityCurvePoint[] {
   let balance = startingCapital;
   
   // Sort trades chronologically

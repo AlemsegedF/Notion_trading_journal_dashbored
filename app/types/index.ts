@@ -58,7 +58,6 @@ export interface Strategy {
 /** Equity curve data point */
 export interface EquityCurvePoint {
   date: Date;
-  tradeNumber: number;
   balance: number;
   pnl: number;
 }
