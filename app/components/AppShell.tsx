@@ -2,11 +2,10 @@
 
 /**
  * AppShell Component
- * Provides the global layout with top bar and left navigation
- * Responsive design - desktop first
+ * Modern layout with smooth animations and professional styling
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { User, NavItem } from '../types';
@@ -76,9 +75,9 @@ const styles = {
     fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
   },
   sidebar: {
-    width: '240px',
-    backgroundColor: '#0f1318',
-    borderRight: '1px solid #1c2230',
+    width: '260px',
+    background: 'linear-gradient(180deg, #0f1318 0%, #0a0d12 100%)',
+    borderRight: '1px solid rgba(28, 34, 48, 0.8)',
     display: 'flex',
     flexDirection: 'column' as const,
     position: 'fixed' as const,
@@ -86,22 +85,39 @@ const styles = {
     left: 0,
     bottom: 0,
     zIndex: 50,
+    animation: 'slideInLeft 0.4s ease-out',
   },
   sidebarHeader: {
-    padding: '20px 20px 16px',
-    borderBottom: '1px solid #1c2230',
+    padding: '24px 20px',
+    borderBottom: '1px solid rgba(28, 34, 48, 0.8)',
   },
   appName: {
-    fontSize: '18px',
+    fontSize: '20px',
     fontWeight: 700,
     color: '#f0b429',
     margin: 0,
     letterSpacing: '-0.02em',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
   },
   appTagline: {
     fontSize: '11px',
     color: '#718096',
-    marginTop: '2px',
+    marginTop: '4px',
+    letterSpacing: '0.02em',
+  },
+  logoIcon: {
+    width: '28px',
+    height: '28px',
+    background: 'linear-gradient(135deg, #f0b429 0%, #f59e0b 100%)',
+    borderRadius: '8px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '14px',
+    fontWeight: 700,
+    color: '#0a0d12',
   },
   nav: {
     flex: 1,
@@ -114,50 +130,76 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '12px',
-    padding: '10px 12px',
-    borderRadius: '8px',
-    color: '#a0aec0',
+    padding: '12px 14px',
+    borderRadius: '10px',
+    color: '#9ca3af',
     textDecoration: 'none',
     fontSize: '14px',
     fontWeight: 500,
-    transition: 'all 0.15s ease',
+    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+    position: 'relative' as const,
+    overflow: 'hidden',
   },
   navLinkActive: {
-    backgroundColor: '#1c2230',
+    backgroundColor: 'rgba(240, 180, 41, 0.1)',
     color: '#f0b429',
+  },
+  navLinkHover: {
+    backgroundColor: 'rgba(28, 34, 48, 0.6)',
+    color: '#e2e8f0',
+    transform: 'translateX(2px)',
   },
   navIcon: {
     width: '20px',
     height: '20px',
+    transition: 'transform 0.2s ease',
+  },
+  activeIndicator: {
+    position: 'absolute' as const,
+    left: 0,
+    top: '50%',
+    transform: 'translateY(-50%)',
+    width: '3px',
+    height: '20px',
+    backgroundColor: '#f0b429',
+    borderRadius: '0 4px 4px 0',
   },
   sidebarFooter: {
     padding: '16px 12px',
-    borderTop: '1px solid #1c2230',
+    borderTop: '1px solid rgba(28, 34, 48, 0.8)',
   },
   userCard: {
     display: 'flex',
     alignItems: 'center',
     gap: '12px',
-    padding: '12px',
-    backgroundColor: '#1c2230',
-    borderRadius: '10px',
+    padding: '14px',
+    backgroundColor: 'rgba(28, 34, 48, 0.5)',
+    borderRadius: '12px',
+    border: '1px solid rgba(28, 34, 48, 0.8)',
+    transition: 'all 0.2s ease',
+    cursor: 'pointer',
+  },
+  userCardHover: {
+    backgroundColor: 'rgba(28, 34, 48, 0.8)',
+    borderColor: 'rgba(240, 180, 41, 0.3)',
   },
   avatar: {
-    width: '36px',
-    height: '36px',
-    borderRadius: '50%',
-    backgroundColor: '#f0b429',
+    width: '38px',
+    height: '38px',
+    borderRadius: '10px',
+    background: 'linear-gradient(135deg, #f0b429 0%, #f59e0b 100%)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     fontSize: '14px',
-    fontWeight: 600,
+    fontWeight: 700,
     color: '#0a0d12',
+    flexShrink: 0,
   },
   avatarImg: {
     width: '100%',
     height: '100%',
-    borderRadius: '50%',
+    borderRadius: '10px',
     objectFit: 'cover' as const,
   },
   userInfo: {
@@ -165,7 +207,7 @@ const styles = {
     minWidth: 0,
   },
   userName: {
-    fontSize: '13px',
+    fontSize: '14px',
     fontWeight: 600,
     color: '#e2e8f0',
     margin: 0,
@@ -185,38 +227,42 @@ const styles = {
     fontSize: '9px',
     fontWeight: 700,
     color: '#0a0d12',
-    backgroundColor: '#f0b429',
-    padding: '2px 6px',
-    borderRadius: '4px',
-    letterSpacing: '0.02em',
+    background: 'linear-gradient(135deg, #f0b429 0%, #f59e0b 100%)',
+    padding: '3px 8px',
+    borderRadius: '6px',
+    letterSpacing: '0.05em',
   },
   main: {
     flex: 1,
-    marginLeft: '240px',
+    marginLeft: '260px',
     display: 'flex',
     flexDirection: 'column' as const,
     minHeight: '100vh',
   },
   topBar: {
-    height: '64px',
-    backgroundColor: '#0f1318',
-    borderBottom: '1px solid #1c2230',
+    height: '70px',
+    background: 'rgba(15, 19, 24, 0.8)',
+    backdropFilter: 'blur(10px)',
+    WebkitBackdropFilter: 'blur(10px)',
+    borderBottom: '1px solid rgba(28, 34, 48, 0.8)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: '0 24px',
+    padding: '0 28px',
     position: 'sticky' as const,
     top: 0,
     zIndex: 40,
+    animation: 'fadeIn 0.3s ease-out',
   },
   topBarLeft: {
     display: 'flex',
     alignItems: 'center',
     gap: '16px',
   },
-  breadcrumb: {
-    fontSize: '14px',
-    color: '#718096',
+  pageTitle: {
+    fontSize: '18px',
+    fontWeight: 600,
+    color: '#e2e8f0',
   },
   topBarRight: {
     display: 'flex',
@@ -227,19 +273,35 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
-    padding: '10px 16px',
-    backgroundColor: '#f0b429',
+    padding: '10px 18px',
+    background: 'linear-gradient(135deg, #f0b429 0%, #f59e0b 100%)',
     color: '#0a0d12',
     border: 'none',
-    borderRadius: '8px',
+    borderRadius: '10px',
     fontSize: '14px',
     fontWeight: 600,
     cursor: 'pointer',
-    transition: 'all 0.15s ease',
+    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+    boxShadow: '0 4px 14px rgba(240, 180, 41, 0.3)',
+  },
+  newTradeBtnHover: {
+    transform: 'translateY(-1px)',
+    boxShadow: '0 6px 20px rgba(240, 180, 41, 0.4)',
+  },
+  newTradeBtnActive: {
+    transform: 'translateY(0)',
   },
   content: {
     flex: 1,
-    padding: '24px',
+    padding: '28px',
+    animation: 'fadeIn 0.4s ease-out',
+  },
+  version: {
+    fontSize: '10px',
+    color: '#4a5568',
+    textAlign: 'center' as const,
+    marginTop: '8px',
+    letterSpacing: '0.05em',
   },
 };
 
@@ -253,6 +315,9 @@ interface AppShellProps {
 
 export default function AppShell({ children, user, onTradeCreated }: AppShellProps) {
   const pathname = usePathname();
+  const [hoveredNav, setHoveredNav] = useState<string | null>(null);
+  const [btnHovered, setBtnHovered] = useState(false);
+  const [userCardHovered, setUserCardHovered] = useState(false);
   const [isNewTradeModalOpen, setIsNewTradeModalOpen] = useState(false);
 
   const getNavLinkStyle = (href: string) => {
@@ -260,6 +325,7 @@ export default function AppShell({ children, user, onTradeCreated }: AppShellPro
     return {
       ...styles.navLink,
       ...(isActive ? styles.navLinkActive : {}),
+      ...(hoveredNav === href && !isActive ? styles.navLinkHover : {}),
     };
   };
 
@@ -269,21 +335,31 @@ export default function AppShell({ children, user, onTradeCreated }: AppShellPro
       <aside style={styles.sidebar}>
         {/* Logo */}
         <div style={styles.sidebarHeader}>
-          <h1 style={styles.appName}>TradeJournal Pro</h1>
+          <h1 style={styles.appName}>
+            <span style={styles.logoIcon}>T</span>
+            TradeJournal Pro
+          </h1>
           <p style={styles.appTagline}>Professional Trading Analytics</p>
         </div>
 
         {/* Navigation */}
         <nav style={styles.nav}>
-          {navItems.map((item) => {
+          {navItems.map((item, index) => {
             const Icon = Icons[item.icon];
+            const isActive = pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href));
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 style={getNavLinkStyle(item.href)}
+                onMouseEnter={() => setHoveredNav(item.href)}
+                onMouseLeave={() => setHoveredNav(null)}
               >
-                <Icon style={styles.navIcon} />
+                {isActive && <div style={styles.activeIndicator} />}
+                <Icon style={{
+                  ...styles.navIcon,
+                  transform: hoveredNav === item.href ? 'scale(1.1)' : 'scale(1)',
+                }} />
                 {item.label}
               </Link>
             );
@@ -292,7 +368,14 @@ export default function AppShell({ children, user, onTradeCreated }: AppShellPro
 
         {/* User Card */}
         <div style={styles.sidebarFooter}>
-          <div style={styles.userCard}>
+          <div 
+            style={{
+              ...styles.userCard,
+              ...(userCardHovered ? styles.userCardHover : {}),
+            }}
+            onMouseEnter={() => setUserCardHovered(true)}
+            onMouseLeave={() => setUserCardHovered(false)}
+          >
             {user.avatarUrl ? (
               <img
                 src={user.avatarUrl}
@@ -310,6 +393,7 @@ export default function AppShell({ children, user, onTradeCreated }: AppShellPro
               <span style={styles.planBadge}>PRO</span>
             )}
           </div>
+          <p style={styles.version}>v2.0.0</p>
         </div>
       </aside>
 
@@ -318,18 +402,17 @@ export default function AppShell({ children, user, onTradeCreated }: AppShellPro
         {/* Top Bar */}
         <header style={styles.topBar}>
           <div style={styles.topBarLeft}>
-            {/* Can add breadcrumbs here if needed */}
+            {/* Page title could go here */}
           </div>
           <div style={styles.topBarRight}>
             <button
-              style={styles.newTradeBtn}
+              style={{
+                ...styles.newTradeBtn,
+                ...(btnHovered ? styles.newTradeBtnHover : {}),
+              }}
               onClick={() => setIsNewTradeModalOpen(true)}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#f5c446';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = '#f0b429';
-              }}
+              onMouseEnter={() => setBtnHovered(true)}
+              onMouseLeave={() => setBtnHovered(false)}
             >
               <Icons.plus style={{ width: '16px', height: '16px' }} />
               New Trade

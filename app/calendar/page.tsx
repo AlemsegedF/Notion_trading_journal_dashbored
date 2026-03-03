@@ -1,15 +1,16 @@
 'use client';
 
 /**
- * Calendar Page
+ * Calendar Page - Modern with optimized loading
  * Trading calendar with trade history
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { User, Trade } from '../types';
+import React, { useState, useMemo } from 'react';
+import { User } from '../types';
 import { mockUser } from '../lib/mockData';
-import { fetchTradesFromNotion, isNotionConfigured } from '../lib/notionData';
+import { useTrades } from '../hooks/useTrades';
 import AppShell from '../components/AppShell';
+import { SkeletonCalendar } from '../components/Skeleton';
 import { formatCurrency, formatShortDate, getValueColor } from '../lib/utils';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -21,12 +22,14 @@ const MONTHS = [
 const styles = {
   header: {
     marginBottom: '24px',
+    animation: 'fadeIn 0.4s ease-out',
   },
   title: {
-    fontSize: '24px',
+    fontSize: '28px',
     fontWeight: 700,
     color: '#e2e8f0',
     margin: '0 0 8px 0',
+    letterSpacing: '-0.02em',
   },
   subtitle: {
     fontSize: '14px',
@@ -38,6 +41,7 @@ const styles = {
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: '24px',
+    animation: 'fadeIn 0.4s ease-out',
   },
   monthSelector: {
     display: 'flex',
@@ -45,36 +49,44 @@ const styles = {
     gap: '16px',
   },
   navButton: {
-    padding: '8px 12px',
-    backgroundColor: '#1c2230',
-    border: '1px solid #2d3748',
-    borderRadius: '8px',
+    padding: '10px 14px',
+    backgroundColor: 'rgba(28, 34, 48, 0.8)',
+    border: '1px solid rgba(28, 34, 48, 0.8)',
+    borderRadius: '10px',
     color: '#e2e8f0',
     fontSize: '16px',
     cursor: 'pointer',
+    transition: 'all 0.2s ease',
+  },
+  navButtonHover: {
+    backgroundColor: 'rgba(240, 180, 41, 0.1)',
+    borderColor: 'rgba(240, 180, 41, 0.3)',
   },
   monthTitle: {
-    fontSize: '18px',
+    fontSize: '20px',
     fontWeight: 600,
     color: '#e2e8f0',
-    minWidth: '200px',
+    minWidth: '220px',
     textAlign: 'center' as const,
   },
   todayButton: {
-    padding: '8px 16px',
-    backgroundColor: '#f0b429',
+    padding: '10px 20px',
+    background: 'linear-gradient(135deg, #f0b429 0%, #f59e0b 100%)',
     border: 'none',
-    borderRadius: '8px',
+    borderRadius: '10px',
     color: '#0a0d12',
     fontSize: '14px',
     fontWeight: 600,
     cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    boxShadow: '0 4px 14px rgba(240, 180, 41, 0.3)',
   },
   calendar: {
-    backgroundColor: '#0f1318',
-    border: '1px solid #1c2230',
-    borderRadius: '12px',
-    padding: '20px',
+    background: 'linear-gradient(135deg, #0f1318 0%, #1c2230 100%)',
+    border: '1px solid rgba(28, 34, 48, 0.8)',
+    borderRadius: '16px',
+    padding: '24px',
+    animation: 'fadeIn 0.5s ease-out',
   },
   weekDays: {
     display: 'grid',
@@ -86,9 +98,10 @@ const styles = {
     textAlign: 'center' as const,
     fontSize: '12px',
     fontWeight: 600,
-    color: '#718096',
+    color: '#9ca3af',
     textTransform: 'uppercase' as const,
-    padding: '8px',
+    padding: '10px',
+    letterSpacing: '0.05em',
   },
   daysGrid: {
     display: 'grid',
@@ -97,23 +110,33 @@ const styles = {
   },
   dayCell: {
     aspectRatio: '1',
-    backgroundColor: '#1c2230',
-    borderRadius: '8px',
-    padding: '8px',
+    backgroundColor: 'rgba(28, 34, 48, 0.5)',
+    borderRadius: '12px',
+    padding: '10px',
     display: 'flex',
     flexDirection: 'column' as const,
     alignItems: 'center',
     justifyContent: 'flex-start',
     cursor: 'pointer',
-    transition: 'all 0.15s',
+    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
     position: 'relative' as const,
+    border: '2px solid transparent',
   },
   dayCellEmpty: {
     backgroundColor: 'transparent',
     cursor: 'default',
   },
   dayCellToday: {
-    border: '2px solid #f0b429',
+    borderColor: '#f0b429',
+    backgroundColor: 'rgba(240, 180, 41, 0.1)',
+  },
+  dayCellSelected: {
+    borderColor: 'rgba(240, 180, 41, 0.5)',
+    backgroundColor: 'rgba(28, 34, 48, 0.8)',
+  },
+  dayCellHover: {
+    transform: 'translateY(-2px)',
+    boxShadow: '0 8px 24px rgba(0, 0, 0, 0.2)',
   },
   dayNumber: {
     fontSize: '14px',
@@ -126,26 +149,27 @@ const styles = {
   dayTrades: {
     display: 'flex',
     flexDirection: 'column' as const,
-    gap: '2px',
-    marginTop: '4px',
+    gap: '3px',
+    marginTop: '6px',
     width: '100%',
   },
   dayTrade: {
     fontSize: '10px',
-    padding: '2px 4px',
-    borderRadius: '3px',
+    padding: '3px 6px',
+    borderRadius: '4px',
     textAlign: 'center' as const,
     fontWeight: 600,
   },
   tradeList: {
     marginTop: '24px',
-    backgroundColor: '#0f1318',
-    border: '1px solid #1c2230',
-    borderRadius: '12px',
-    padding: '20px',
+    background: 'linear-gradient(135deg, #0f1318 0%, #1c2230 100%)',
+    border: '1px solid rgba(28, 34, 48, 0.8)',
+    borderRadius: '16px',
+    padding: '24px',
+    animation: 'fadeIn 0.4s ease-out',
   },
   tradeListTitle: {
-    fontSize: '16px',
+    fontSize: '18px',
     fontWeight: 600,
     color: '#e2e8f0',
     margin: '0 0 16px 0',
@@ -154,108 +178,104 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '12px',
-    backgroundColor: '#1c2230',
-    borderRadius: '8px',
-    marginBottom: '8px',
+    padding: '14px',
+    backgroundColor: 'rgba(28, 34, 48, 0.5)',
+    borderRadius: '12px',
+    marginBottom: '10px',
+    transition: 'all 0.2s ease',
+    border: '1px solid transparent',
+  },
+  tradeItemHover: {
+    backgroundColor: 'rgba(28, 34, 48, 0.8)',
+    borderColor: 'rgba(240, 180, 41, 0.2)',
+    transform: 'translateX(4px)',
   },
   tradeInfo: {
     display: 'flex',
     flexDirection: 'column' as const,
-    gap: '2px',
+    gap: '3px',
   },
   tradeInstrument: {
-    fontSize: '14px',
+    fontSize: '15px',
     fontWeight: 600,
     color: '#e2e8f0',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
   },
   tradeSetup: {
-    fontSize: '12px',
+    fontSize: '13px',
     color: '#718096',
   },
   tradeOutcome: {
     fontSize: '12px',
     fontWeight: 600,
-    padding: '4px 10px',
-    borderRadius: '6px',
+    padding: '5px 12px',
+    borderRadius: '20px',
   },
   loading: {
     padding: '60px',
     textAlign: 'center' as const,
     color: '#718096',
   },
+  demoBanner: {
+    background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(240, 180, 41, 0.1) 100%)',
+    border: '1px solid rgba(245, 158, 11, 0.3)',
+    borderRadius: '12px',
+    padding: '14px 18px',
+    marginBottom: '20px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    animation: 'fadeIn 0.4s ease-out',
+  },
+  demoIcon: {
+    fontSize: '20px',
+  },
+  demoText: {
+    fontSize: '13px',
+    color: '#f59e0b',
+    margin: 0,
+    fontWeight: 500,
+  },
 };
 
 export default function CalendarPage() {
   const [user] = useState<User>(mockUser);
-  const [trades, setTrades] = useState<Trade[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { trades, isLoading, usingMockData, refresh } = useTrades();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [hoveredDay, setHoveredDay] = useState<number | null>(null);
+  const [hoveredTrade, setHoveredTrade] = useState<string | null>(null);
+  const [navBtnHovered, setNavBtnHovered] = useState<number | null>(null);
 
-  const loadData = async () => {
-    setIsLoading(true);
-    try {
-      const notionReady = await isNotionConfigured();
-      if (notionReady) {
-        const realTrades = await fetchTradesFromNotion();
-        setTrades(realTrades);
-      } else {
-        const { mockTrades } = await import('../lib/mockData');
-        setTrades(mockTrades);
-      }
-    } catch (error) {
-      console.error('Error loading trades:', error);
-      const { mockTrades } = await import('../lib/mockData');
-      setTrades(mockTrades);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  // Calendar calculations
   const calendarData = useMemo(() => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
-
     const firstDayOfMonth = new Date(year, month, 1);
     const lastDayOfMonth = new Date(year, month + 1, 0);
     const daysInMonth = lastDayOfMonth.getDate();
     const startingDayOfWeek = firstDayOfMonth.getDay();
 
     const days = [];
-    
-    // Empty cells for days before the first day of the month
-    for (let i = 0; i < startingDayOfWeek; i++) {
-      days.push(null);
-    }
-
-    // Days of the month
+    for (let i = 0; i < startingDayOfWeek; i++) days.push(null);
     for (let day = 1; day <= daysInMonth; day++) {
       const date = new Date(year, month, day);
       const dayTrades = trades.filter(trade => {
         const tradeDate = new Date(trade.exitTime);
-        return tradeDate.getDate() === day &&
-               tradeDate.getMonth() === month &&
-               tradeDate.getFullYear() === year;
+        return tradeDate.getDate() === day && tradeDate.getMonth() === month && tradeDate.getFullYear() === year;
       });
       days.push({ date, trades: dayTrades });
     }
-
     return { days, year, month };
   }, [currentDate, trades]);
 
-  // Selected date trades
   const selectedDateTrades = useMemo(() => {
     if (!selectedDate) return [];
     return trades.filter(trade => {
       const tradeDate = new Date(trade.exitTime);
-      return tradeDate.getDate() === selectedDate.getDate() &&
-             tradeDate.getMonth() === selectedDate.getMonth() &&
+      return tradeDate.getDate() === selectedDate.getDate() && 
+             tradeDate.getMonth() === selectedDate.getMonth() && 
              tradeDate.getFullYear() === selectedDate.getFullYear();
     });
   }, [selectedDate, trades]);
@@ -266,94 +286,94 @@ export default function CalendarPage() {
   };
 
   const goToToday = () => {
-    setCurrentDate(new Date());
-    setSelectedDate(new Date());
+    const today = new Date();
+    setCurrentDate(today);
+    setSelectedDate(today);
   };
 
   const isToday = (date: Date) => {
     const today = new Date();
-    return date.getDate() === today.getDate() &&
-           date.getMonth() === today.getMonth() &&
-           date.getFullYear() === today.getFullYear();
+    return date.getDate() === today.getDate() && date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear();
   };
 
-  if (isLoading) {
+  if (isLoading && trades.length === 0) {
     return (
-      <AppShell user={user} onTradeCreated={loadData}>
-        <div style={styles.loading}>Loading calendar...</div>
+      <AppShell user={user}>
+        <div style={styles.header}>
+          <h1 style={styles.title}>Calendar</h1>
+          <p style={styles.subtitle}>View your trading activity by date</p>
+        </div>
+        <SkeletonCalendar />
       </AppShell>
     );
   }
 
   return (
-    <AppShell user={user}>
+    <AppShell user={user} onTradeCreated={refresh}>
       <div style={styles.header}>
         <h1 style={styles.title}>Calendar</h1>
         <p style={styles.subtitle}>View your trading activity by date</p>
       </div>
 
+      {usingMockData && (
+        <div style={styles.demoBanner}>
+          <span style={styles.demoIcon}>⚡</span>
+          <p style={styles.demoText}>Demo Mode: Add NOTION_TOKEN to use real data</p>
+        </div>
+      )}
+
       <div style={styles.controls}>
         <div style={styles.monthSelector}>
-          <button style={styles.navButton} onClick={() => navigateMonth(-1)}>←</button>
-          <div style={styles.monthTitle}>
-            {MONTHS[calendarData.month]} {calendarData.year}
-          </div>
-          <button style={styles.navButton} onClick={() => navigateMonth(1)}>→</button>
+          <button 
+            style={{ ...styles.navButton, ...(navBtnHovered === -1 ? styles.navButtonHover : {}) }}
+            onClick={() => navigateMonth(-1)}
+            onMouseEnter={() => setNavBtnHovered(-1)}
+            onMouseLeave={() => setNavBtnHovered(null)}
+          >←</button>
+          <div style={styles.monthTitle}>{MONTHS[calendarData.month]} {calendarData.year}</div>
+          <button 
+            style={{ ...styles.navButton, ...(navBtnHovered === 1 ? styles.navButtonHover : {}) }}
+            onClick={() => navigateMonth(1)}
+            onMouseEnter={() => setNavBtnHovered(1)}
+            onMouseLeave={() => setNavBtnHovered(null)}
+          >→</button>
         </div>
         <button style={styles.todayButton} onClick={goToToday}>Today</button>
       </div>
 
       <div style={styles.calendar}>
         <div style={styles.weekDays}>
-          {DAYS.map(day => (
-            <div key={day} style={styles.weekDay}>{day}</div>
-          ))}
+          {DAYS.map(day => <div key={day} style={styles.weekDay}>{day}</div>)}
         </div>
         <div style={styles.daysGrid}>
           {calendarData.days.map((dayData, index) => {
-            if (!dayData) {
-              return <div key={`empty-${index}`} style={{ ...styles.dayCell, ...styles.dayCellEmpty }} />;
-            }
-
+            if (!dayData) return <div key={`empty-${index}`} style={{ ...styles.dayCell, ...styles.dayCellEmpty }} />;
             const { date, trades: dayTrades } = dayData;
-            const winCount = dayTrades.filter(t => t.outcome === 'WIN').length;
-            const lossCount = dayTrades.filter(t => t.outcome === 'LOSS').length;
-            const dayPnl = dayTrades.reduce((sum, t) => sum + t.pnlCurrency, 0);
-
             return (
               <div
                 key={date.toISOString()}
                 style={{
                   ...styles.dayCell,
                   ...(isToday(date) ? styles.dayCellToday : {}),
-                  ...(selectedDate?.getTime() === date.getTime() ? { backgroundColor: '#252d3d' } : {}),
+                  ...(selectedDate?.getTime() === date.getTime() ? styles.dayCellSelected : {}),
+                  ...(hoveredDay === index ? styles.dayCellHover : {}),
                 }}
                 onClick={() => setSelectedDate(date)}
+                onMouseEnter={() => setHoveredDay(index)}
+                onMouseLeave={() => setHoveredDay(null)}
               >
-                <span style={{
-                  ...styles.dayNumber,
-                  ...(date.getMonth() !== calendarData.month ? styles.dayNumberMuted : {}),
-                }}>
+                <span style={{ ...styles.dayNumber, ...(date.getMonth() !== calendarData.month ? styles.dayNumberMuted : {}) }}>
                   {date.getDate()}
                 </span>
                 {dayTrades.length > 0 && (
                   <div style={styles.dayTrades}>
                     {dayTrades.slice(0, 3).map((trade, i) => (
-                      <div
-                        key={i}
-                        style={{
-                          ...styles.dayTrade,
-                          backgroundColor: trade.outcome === 'WIN' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)',
-                          color: trade.outcome === 'WIN' ? '#22c55e' : '#ef4444',
-                        }}
-                      >
+                      <div key={i} style={{ ...styles.dayTrade, backgroundColor: trade.outcome === 'WIN' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)', color: trade.outcome === 'WIN' ? '#22c55e' : '#ef4444' }}>
                         {trade.instrument}
                       </div>
                     ))}
                     {dayTrades.length > 3 && (
-                      <div style={{ ...styles.dayTrade, backgroundColor: '#252d3d', color: '#718096' }}>
-                        +{dayTrades.length - 3} more
-                      </div>
+                      <div style={{ ...styles.dayTrade, backgroundColor: '#252d3d', color: '#718096' }}>+{dayTrades.length - 3}</div>
                     )}
                   </div>
                 )}
@@ -365,24 +385,26 @@ export default function CalendarPage() {
 
       {selectedDate && selectedDateTrades.length > 0 && (
         <div style={styles.tradeList}>
-          <h3 style={styles.tradeListTitle}>
-            Trades on {formatShortDate(selectedDate)}
-          </h3>
+          <h3 style={styles.tradeListTitle}>Trades on {formatShortDate(selectedDate)}</h3>
           {selectedDateTrades.map((trade) => (
-            <div key={trade.id} style={styles.tradeItem}>
+            <div 
+              key={trade.id} 
+              style={{ ...styles.tradeItem, ...(hoveredTrade === trade.id ? styles.tradeItemHover : {}) }}
+              onMouseEnter={() => setHoveredTrade(trade.id)}
+              onMouseLeave={() => setHoveredTrade(null)}
+            >
               <div style={styles.tradeInfo}>
-                <span style={styles.tradeInstrument}>{trade.instrument}</span>
+                <span style={styles.tradeInstrument}>
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: trade.outcome === 'WIN' ? '#22c55e' : '#ef4444' }} />
+                  {trade.instrument}
+                </span>
                 <span style={styles.tradeSetup}>{trade.setup} • {trade.direction}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span style={{ fontSize: '14px', fontWeight: 600, color: getValueColor(trade.pnlCurrency) }}>
+                <span style={{ fontSize: '15px', fontWeight: 600, color: getValueColor(trade.pnlCurrency) }}>
                   {formatCurrency(trade.pnlCurrency)}
                 </span>
-                <span style={{
-                  ...styles.tradeOutcome,
-                  backgroundColor: trade.outcome === 'WIN' ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                  color: trade.outcome === 'WIN' ? '#22c55e' : '#ef4444',
-                }}>
+                <span style={{ ...styles.tradeOutcome, backgroundColor: trade.outcome === 'WIN' ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)', color: trade.outcome === 'WIN' ? '#22c55e' : '#ef4444' }}>
                   {trade.outcome}
                 </span>
               </div>

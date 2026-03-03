@@ -1,6 +1,6 @@
 /**
  * Global Styles for TradeJournal Pro
- * Dark theme with gold accents
+ * Dark theme with gold accents - Modern & Professional
  */
 
 /* ─── CSS RESET & BASE ─────────────────────────────────────────────────────── */
@@ -72,7 +72,7 @@ code, pre {
 a {
   color: #f0b429;
   text-decoration: none;
-  transition: color 0.15s ease;
+  transition: all 0.2s ease;
 }
 
 a:hover {
@@ -84,6 +84,7 @@ a:hover {
 button {
   font-family: inherit;
   cursor: pointer;
+  transition: all 0.2s ease;
 }
 
 button:focus-visible {
@@ -91,11 +92,22 @@ button:focus-visible {
   outline-offset: 2px;
 }
 
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* ─── FORM ELEMENTS ────────────────────────────────────────────────────────── */
 
 input, select, textarea {
   font-family: inherit;
   font-size: inherit;
+  transition: all 0.2s ease;
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: #f0b429;
+  box-shadow: 0 0 0 2px rgba(240, 180, 41, 0.2);
 }
 
 /* ─── RECHARTS OVERRIDES ───────────────────────────────────────────────────── */
@@ -117,10 +129,21 @@ input, select, textarea {
   }
 }
 
-@keyframes slideIn {
+@keyframes fadeInScale {
   from {
     opacity: 0;
-    transform: translateX(-10px);
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
   }
   to {
     opacity: 1;
@@ -128,12 +151,119 @@ input, select, textarea {
   }
 }
 
-.animate-fade-in {
-  animation: fadeIn 0.3s ease-out;
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
-.animate-slide-in {
-  animation: slideIn 0.3s ease-out;
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+@keyframes glow {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(240, 180, 41, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(240, 180, 41, 0.6);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out;
+}
+
+.animate-fade-in-scale {
+  animation: fadeInScale 0.3s ease-out;
+}
+
+.animate-slide-in-left {
+  animation: slideInLeft 0.4s ease-out;
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.4s ease-out;
+}
+
+.animate-pulse {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-glow {
+  animation: glow 2s ease-in-out infinite;
+}
+
+/* Staggered animations for lists */
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.1s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.2s; }
+.stagger-5 { animation-delay: 0.25s; }
+
+/* ─── MODERN CARD HOVER EFFECTS ────────────────────────────────────────────── */
+
+.card-hover {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+/* ─── GLASSMORPHISM ────────────────────────────────────────────────────────── */
+
+.glass {
+  background: rgba(15, 19, 24, 0.8);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 /* ─── UTILITY CLASSES ──────────────────────────────────────────────────────── */
@@ -166,12 +296,86 @@ input, select, textarea {
   background-color: rgba(240, 180, 41, 0.1);
 }
 
+/* ─── LOADING STATES ───────────────────────────────────────────────────────── */
+
+.loading-shimmer {
+  background: linear-gradient(90deg, #1c2230 25%, #252d3d 50%, #1c2230 75%);
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite linear;
+}
+
+/* ─── FOCUS STYLES ─────────────────────────────────────────────────────────── */
+
+.focus-ring:focus-visible {
+  outline: none;
+  ring: 2px;
+  ring-color: #f0b429;
+  ring-offset: 2px;
+  ring-offset-color: #0a0d12;
+}
+
+/* ─── SMOOTH TRANSITIONS ───────────────────────────────────────────────────── */
+
+.transition-all {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.transition-transform {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.transition-opacity {
+  transition: opacity 0.2s ease;
+}
+
 /* ─── RESPONSIVE UTILITIES ─────────────────────────────────────────────────── */
 
 @media (max-width: 1024px) {
   /* Tablet adjustments */
+  .hide-tablet {
+    display: none;
+  }
 }
 
 @media (max-width: 768px) {
-  /* Mobile adjustments - sidebar would collapse to hamburger menu */
+  /* Mobile adjustments */
+  .hide-mobile {
+    display: none;
+  }
+  
+  body {
+    font-size: 13px;
+  }
+}
+
+/* ─── PRINT STYLES ─────────────────────────────────────────────────────────── */
+
+@media print {
+  body {
+    background: white;
+    color: black;
+  }
+  
+  .no-print {
+    display: none !important;
+  }
+}
+
+/* ─── ACCESSIBILITY ────────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .card-hover:hover {
+    border-color: #f0b429;
+  }
 }

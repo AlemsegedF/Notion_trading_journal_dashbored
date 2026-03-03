@@ -1,23 +1,22 @@
 'use client';
 
 /**
- * TopStrategiesCard Component
+ * TopStrategiesCard Component - Modern with hover effects
  * Displays ranked list of top performing strategies
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { Strategy } from '../types';
 import { formatCurrency, getValueColor } from '../lib/utils';
 
-// ─── STYLES ──────────────────────────────────────────────────────────────────
-
 const styles = {
   card: {
-    backgroundColor: '#0f1318',
-    border: '1px solid #1c2230',
-    borderRadius: '12px',
+    background: 'linear-gradient(135deg, #0f1318 0%, #1c2230 100%)',
+    border: '1px solid rgba(28, 34, 48, 0.8)',
+    borderRadius: '16px',
     padding: '20px',
+    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
   },
   header: {
     display: 'flex',
@@ -42,49 +41,62 @@ const styles = {
     color: '#f0b429',
     textDecoration: 'none',
     fontWeight: 500,
-    padding: '4px 8px',
-    borderRadius: '6px',
-    transition: 'background-color 0.15s',
+    padding: '6px 12px',
+    borderRadius: '8px',
+    transition: 'all 0.2s ease',
+  },
+  viewAllLinkHover: {
+    backgroundColor: 'rgba(240, 180, 41, 0.1)',
   },
   strategyList: {
     display: 'flex',
     flexDirection: 'column' as const,
-    gap: '12px',
+    gap: '10px',
   },
   strategyItem: {
     display: 'flex',
     alignItems: 'center',
-    gap: '16px',
+    gap: '14px',
     padding: '14px',
-    backgroundColor: '#1c2230',
-    borderRadius: '10px',
-    transition: 'background-color 0.15s',
+    backgroundColor: 'rgba(28, 34, 48, 0.5)',
+    borderRadius: '12px',
+    border: '1px solid transparent',
+    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+    cursor: 'pointer',
+  },
+  strategyItemHover: {
+    backgroundColor: 'rgba(28, 34, 48, 0.8)',
+    borderColor: 'rgba(240, 180, 41, 0.2)',
+    transform: 'translateX(4px)',
   },
   rank: {
-    width: '32px',
-    height: '32px',
-    borderRadius: '8px',
+    width: '36px',
+    height: '36px',
+    borderRadius: '10px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     fontSize: '14px',
     fontWeight: 700,
     fontFamily: "'JetBrains Mono', monospace",
+    flexShrink: 0,
+    transition: 'all 0.2s ease',
   },
   rank1: {
-    backgroundColor: 'rgba(245, 158, 11, 0.2)',
+    background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.3) 0%, rgba(245, 158, 11, 0.1) 100%)',
     color: '#f59e0b',
+    boxShadow: '0 4px 12px rgba(245, 158, 11, 0.2)',
   },
   rank2: {
-    backgroundColor: 'rgba(156, 163, 175, 0.2)',
+    background: 'linear-gradient(135deg, rgba(156, 163, 175, 0.3) 0%, rgba(156, 163, 175, 0.1) 100%)',
     color: '#9ca3af',
   },
   rank3: {
-    backgroundColor: 'rgba(180, 83, 9, 0.2)',
+    background: 'linear-gradient(135deg, rgba(180, 83, 9, 0.3) 0%, rgba(180, 83, 9, 0.1) 100%)',
     color: '#b45309',
   },
   rankOther: {
-    backgroundColor: '#252d3d',
+    backgroundColor: 'rgba(37, 45, 61, 0.8)',
     color: '#718096',
   },
   strategyInfo: {
@@ -106,6 +118,7 @@ const styles = {
   },
   statHighlight: {
     color: '#a0aec0',
+    fontWeight: 500,
   },
   pnl: {
     fontSize: '15px',
@@ -120,15 +133,15 @@ const styles = {
   },
 };
 
-// ─── COMPONENT ───────────────────────────────────────────────────────────────
-
 interface TopStrategiesCardProps {
   strategies: Strategy[];
   maxStrategies?: number;
 }
 
 export default function TopStrategiesCard({ strategies, maxStrategies = 4 }: TopStrategiesCardProps) {
-  // Sort by total P&L descending and take top N
+  const [hoveredStrategy, setHoveredStrategy] = useState<string | null>(null);
+  const [linkHovered, setLinkHovered] = useState(false);
+
   const topStrategies = strategies
     .slice()
     .sort((a, b) => b.totalPnlCurrency - a.totalPnlCurrency)
@@ -136,14 +149,10 @@ export default function TopStrategiesCard({ strategies, maxStrategies = 4 }: Top
 
   const getRankStyle = (rank: number) => {
     switch (rank) {
-      case 1:
-        return styles.rank1;
-      case 2:
-        return styles.rank2;
-      case 3:
-        return styles.rank3;
-      default:
-        return styles.rankOther;
+      case 1: return styles.rank1;
+      case 2: return styles.rank2;
+      case 3: return styles.rank3;
+      default: return styles.rankOther;
     }
   };
 
@@ -156,13 +165,12 @@ export default function TopStrategiesCard({ strategies, maxStrategies = 4 }: Top
         </div>
         <Link 
           href="/strategies" 
-          style={styles.viewAllLink}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#f0b42922';
+          style={{
+            ...styles.viewAllLink,
+            ...(linkHovered ? styles.viewAllLinkHover : {}),
           }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'transparent';
-          }}
+          onMouseEnter={() => setLinkHovered(true)}
+          onMouseLeave={() => setLinkHovered(false)}
         >
           View All →
         </Link>
@@ -179,13 +187,12 @@ export default function TopStrategiesCard({ strategies, maxStrategies = 4 }: Top
             return (
               <div 
                 key={strategy.id} 
-                style={styles.strategyItem}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#252d3d';
+                style={{
+                  ...styles.strategyItem,
+                  ...(hoveredStrategy === strategy.id ? styles.strategyItemHover : {}),
                 }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#1c2230';
-                }}
+                onMouseEnter={() => setHoveredStrategy(strategy.id)}
+                onMouseLeave={() => setHoveredStrategy(null)}
               >
                 <div style={{ ...styles.rank, ...getRankStyle(rank) }}>
                   {rank}

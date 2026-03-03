@@ -1,22 +1,14 @@
 'use client';
 
 /**
- * Dashboard Page
- * Main dashboard view with real Notion data
+ * Dashboard Page - Modern & Optimized
+ * Fast loading with caching and skeleton states
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { User, Trade, Strategy, KpiMetrics, PerformanceMetrics, EquityCurvePoint } from '../types';
-
-// Real data fetching from Notion
-import {
-  fetchTradesFromNotion,
-  fetchTodaysTradesFromNotion,
-  fetchStrategiesFromNotion,
-  isNotionConfigured,
-} from '../lib/notionData';
-
-// Calculation utilities (work with any Trade[] data)
+import React, { useMemo } from 'react';
+import { User, KpiMetrics, PerformanceMetrics, EquityCurvePoint } from '../types';
+import { mockUser } from '../lib/mockData';
+import { useTrades } from '../hooks/useTrades';
 import {
   calculateTotalReturn,
   calculateWinRate,
@@ -31,13 +23,6 @@ import {
   generateEquityCurve,
 } from '../lib/mockData';
 
-// Fallback mock data (used if Notion is not configured)
-import {
-  mockUser,
-  mockTrades,
-  mockStrategies,
-} from '../lib/mockData';
-
 // Components
 import AppShell from '../components/AppShell';
 import DashboardHeader from '../components/DashboardHeader';
@@ -46,10 +31,75 @@ import EquityCurveCard from '../components/EquityCurveCard';
 import PerformanceMetricsCard from '../components/PerformanceMetricsCard';
 import RecentTradesCard from '../components/RecentTradesCard';
 import TopStrategiesCard from '../components/TopStrategiesCard';
+import { SkeletonDashboard, SkeletonKpiCards, SkeletonChart, SkeletonTradeList } from '../components/Skeleton';
 
 // ─── STYLES ──────────────────────────────────────────────────────────────────
 
 const styles = {
+  refreshIndicator: {
+    position: 'fixed' as const,
+    top: '80px',
+    right: '28px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '8px 14px',
+    backgroundColor: 'rgba(15, 19, 24, 0.9)',
+    backdropFilter: 'blur(10px)',
+    borderRadius: '20px',
+    fontSize: '12px',
+    color: '#718096',
+    border: '1px solid rgba(28, 34, 48, 0.8)',
+    zIndex: 30,
+    animation: 'fadeIn 0.3s ease-out',
+  },
+  spinner: {
+    width: '14px',
+    height: '14px',
+    border: '2px solid #1c2230',
+    borderTopColor: '#f0b429',
+    borderRadius: '50%',
+    animation: 'spin 1s linear infinite',
+  },
+  demoBanner: {
+    background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(240, 180, 41, 0.1) 100%)',
+    border: '1px solid rgba(245, 158, 11, 0.3)',
+    borderRadius: '12px',
+    padding: '14px 18px',
+    marginBottom: '24px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    animation: 'fadeIn 0.4s ease-out',
+  },
+  demoIcon: {
+    fontSize: '20px',
+  },
+  demoText: {
+    fontSize: '13px',
+    color: '#f59e0b',
+    margin: 0,
+    fontWeight: 500,
+  },
+  mainGrid: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 380px',
+    gap: '24px',
+    marginTop: '24px',
+    animation: 'fadeIn 0.5s ease-out',
+  },
+  leftColumn: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '24px',
+    animation: 'slideInLeft 0.5s ease-out',
+  },
+  rightColumn: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '24px',
+    animation: 'slideInRight 0.5s ease-out',
+  },
   loadingContainer: {
     display: 'flex',
     justifyContent: 'center',
@@ -85,215 +135,115 @@ const styles = {
   retryButton: {
     padding: '10px 20px',
     backgroundColor: '#f0b429',
-    color: '#0a0d12',
     border: 'none',
     borderRadius: '8px',
+    color: '#0a0d12',
     fontSize: '14px',
     fontWeight: 600,
     cursor: 'pointer',
-  },
-  banner: {
-    backgroundColor: 'rgba(245, 158, 11, 0.15)',
-    border: '1px solid rgba(245, 158, 11, 0.3)',
-    borderRadius: '8px',
-    padding: '12px 16px',
-    marginBottom: '20px',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-  },
-  bannerIcon: {
-    fontSize: '18px',
-  },
-  bannerText: {
-    fontSize: '13px',
-    color: '#f59e0b',
-    margin: 0,
-  },
-  mainGrid: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 380px',
-    gap: '24px',
-    marginTop: '24px',
-  },
-  leftColumn: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '24px',
-  },
-  rightColumn: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '24px',
+    transition: 'all 0.2s ease',
   },
 };
 
 // ─── COMPONENT ───────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
-  // State for data
-  const [user] = useState<User>(mockUser);
-  const [trades, setTrades] = useState<Trade[]>([]);
-  const [strategies, setStrategies] = useState<Strategy[]>([]);
-  const [todayTrades, setTodayTrades] = useState<Trade[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [usingMockData, setUsingMockData] = useState(false);
+  const { trades, strategies, isLoading, isRefreshing, error, usingMockData, refresh, lastUpdated } = useTrades();
 
-  // Fetch data from Notion
-  const loadData = async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      // Check if Notion is configured
-      const notionReady = await isNotionConfigured();
-
-      if (!notionReady) {
-        console.warn('Notion not configured - falling back to mock data');
-        setUsingMockData(true);
-        setTrades(mockTrades);
-        setStrategies(mockStrategies);
-        
-        // Get today's trades from mock
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const todays = mockTrades.filter(trade => {
-          const tradeDate = new Date(trade.exitTime);
-          tradeDate.setHours(0, 0, 0, 0);
-          return tradeDate.getTime() === today.getTime();
-        });
-        setTodayTrades(todays);
-        setIsLoading(false);
-        return;
-      }
-
-      // Fetch real data from Notion in parallel
-      const [allTrades, todaysTrades, allStrategies] = await Promise.all([
-        fetchTradesFromNotion(),
-        fetchTodaysTradesFromNotion(),
-        fetchStrategiesFromNotion(),
-      ]);
-
-      setTrades(allTrades);
-      setTodayTrades(todaysTrades);
-      setStrategies(allStrategies);
-      setUsingMockData(false);
-    } catch (err) {
-      console.error('Error loading data:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load data');
-      
-      // Fallback to mock data on error
-      setUsingMockData(true);
-      setTrades(mockTrades);
-      setStrategies(mockStrategies);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadData();
-  }, []);
+  // Get today's trades
+  const todayTrades = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return trades.filter(trade => {
+      const tradeDate = new Date(trade.exitTime);
+      tradeDate.setHours(0, 0, 0, 0);
+      return tradeDate.getTime() === today.getTime();
+    });
+  }, [trades]);
 
   // Calculate KPI metrics
   const kpiMetrics: KpiMetrics = useMemo(() => {
     const startingCapital = 50000;
     const totalReturn = calculateTotalReturn(trades, startingCapital);
-    
-    // Calculate change vs previous period
-    // For real data, you might want to compare month-over-month or week-over-week
-    const previousReturn = totalReturn * 0.9; // Placeholder
+    const previousReturn = totalReturn * 0.9;
     const change = totalReturn - previousReturn;
-
     const overallWinRate = calculateWinRate(trades);
     const lastNWinRate = calculateWinRateLastN(trades, 20);
     const profitFactor = calculateProfitFactor(trades);
-
     const todaysPnl = todayTrades.reduce((sum, t) => sum + t.pnlCurrency, 0);
 
     return {
-      totalReturn: {
-        value: totalReturn,
-        change: change,
-      },
-      winRate: {
-        overall: overallWinRate,
-        lastNTrades: lastNWinRate,
-        lastNCount: 20,
-      },
-      profitFactor: {
-        value: profitFactor,
-        status: getProfitFactorStatus(profitFactor),
-      },
-      todaysPnl: {
-        value: todaysPnl,
-        tradeCount: todayTrades.length,
-      },
+      totalReturn: { value: totalReturn, change },
+      winRate: { overall: overallWinRate, lastNTrades: lastNWinRate, lastNCount: 20 },
+      profitFactor: { value: profitFactor, status: getProfitFactorStatus(profitFactor) },
+      todaysPnl: { value: todaysPnl, tradeCount: todayTrades.length },
     };
   }, [trades, todayTrades]);
 
   // Calculate performance metrics
-  const performanceMetrics: PerformanceMetrics = useMemo(() => {
-    return {
-      expectancy: calculateExpectancy(trades),
-      avgWin: calculateAvgWin(trades),
-      avgLoss: calculateAvgLoss(trades),
-      maxDrawdown: calculateMaxDrawdown(trades, 50000),
-      avgTradeDuration: calculateAvgTradeDuration(trades),
-      totalTrades: trades.length,
-    };
-  }, [trades]);
+  const performanceMetrics: PerformanceMetrics = useMemo(() => ({
+    expectancy: calculateExpectancy(trades),
+    avgWin: calculateAvgWin(trades),
+    avgLoss: calculateAvgLoss(trades),
+    maxDrawdown: calculateMaxDrawdown(trades, 50000),
+    avgTradeDuration: calculateAvgTradeDuration(trades),
+    totalTrades: trades.length,
+  }), [trades]);
 
   // Generate equity curve data
-  const equityCurveData: EquityCurvePoint[] = useMemo(() => {
-    return generateEquityCurve(trades, 50000);
-  }, [trades]);
+  const equityCurveData: EquityCurvePoint[] = useMemo(() => 
+    generateEquityCurve(trades, 50000),
+  [trades]);
 
-  // Handle trade created - refresh data
-  const handleTradeCreated = () => {
-    loadData();
-  };
-
-  // Handle retry on error
+  // Handle retry
   const handleRetry = () => {
-    loadData();
+    refresh();
   };
 
-  if (isLoading) {
+  if (isLoading && trades.length === 0) {
     return (
-      <div style={styles.loadingContainer}>
-        Loading dashboard...
-      </div>
+      <AppShell user={mockUser}>
+        <SkeletonDashboard />
+      </AppShell>
     );
   }
 
   if (error && trades.length === 0) {
     return (
-      <div style={styles.errorContainer}>
-        <h2 style={styles.errorTitle}>Error Loading Data</h2>
-        <p style={styles.errorMessage}>{error}</p>
-        <button style={styles.retryButton} onClick={handleRetry}>
-          Retry
-        </button>
+      <div style={styles.loadingContainer}>
+        <div style={styles.errorContainer}>
+          <h2 style={styles.errorTitle}>Error Loading Data</h2>
+          <p style={styles.errorMessage}>{error}</p>
+          <button style={styles.retryButton} onClick={handleRetry}>
+            Retry
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <AppShell user={user} onTradeCreated={handleTradeCreated}>
+    <AppShell user={mockUser} onTradeCreated={refresh}>
+      {/* Refresh Indicator */}
+      {isRefreshing && (
+        <div style={styles.refreshIndicator}>
+          <div style={styles.spinner} />
+          <span>Refreshing...</span>
+        </div>
+      )}
+
+      {/* Demo Banner */}
       {usingMockData && (
-        <div style={styles.banner}>
-          <span style={styles.bannerIcon}>⚠️</span>
-          <p style={styles.bannerText}>
-            Using demo data. Connect your Notion database to see real trades. 
-            Add NOTION_TOKEN and NOTION_DATABASE_ID environment variables in Vercel.
+        <div style={styles.demoBanner}>
+          <span style={styles.demoIcon}>⚡</span>
+          <p style={styles.demoText}>
+            Demo Mode: Add NOTION_TOKEN and NOTION_DATABASE_ID to use real data
           </p>
         </div>
       )}
 
       <DashboardHeader 
-        user={user} 
+        user={mockUser} 
         todayTradeCount={todayTrades.length} 
       />
 

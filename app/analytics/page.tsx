@@ -1,29 +1,20 @@
 'use client';
 
 /**
- * Analytics Page
+ * Analytics Page - Modern with optimized loading
  * Detailed trading analytics with charts
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  LineChart,
-  Line,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, LineChart, Line,
 } from 'recharts';
-import { User, Trade } from '../types';
+import { User } from '../types';
 import { mockUser } from '../lib/mockData';
-import { fetchTradesFromNotion, isNotionConfigured } from '../lib/notionData';
+import { useTrades } from '../hooks/useTrades';
 import AppShell from '../components/AppShell';
+import { SkeletonChart } from '../components/Skeleton';
 import { formatCurrency, formatShortDate, getValueColor } from '../lib/utils';
 
 const COLORS = {
@@ -38,12 +29,14 @@ const COLORS = {
 const styles = {
   header: {
     marginBottom: '24px',
+    animation: 'fadeIn 0.4s ease-out',
   },
   title: {
-    fontSize: '24px',
+    fontSize: '28px',
     fontWeight: 700,
     color: '#e2e8f0',
     margin: '0 0 8px 0',
+    letterSpacing: '-0.02em',
   },
   subtitle: {
     fontSize: '14px',
@@ -54,23 +47,24 @@ const styles = {
     display: 'flex',
     gap: '8px',
     marginBottom: '24px',
-    borderBottom: '1px solid #1c2230',
+    borderBottom: '1px solid rgba(28, 34, 48, 0.8)',
     paddingBottom: '12px',
+    animation: 'fadeIn 0.4s ease-out',
   },
   tab: {
-    padding: '8px 16px',
+    padding: '10px 18px',
     backgroundColor: 'transparent',
-    border: '1px solid #1c2230',
-    borderRadius: '8px',
-    color: '#718096',
+    border: '1px solid transparent',
+    borderRadius: '10px',
+    color: '#9ca3af',
     fontSize: '14px',
     fontWeight: 500,
     cursor: 'pointer',
-    transition: 'all 0.15s',
+    transition: 'all 0.2s ease',
   },
   tabActive: {
-    backgroundColor: '#1c2230',
-    borderColor: '#f0b429',
+    backgroundColor: 'rgba(240, 180, 41, 0.1)',
+    borderColor: 'rgba(240, 180, 41, 0.3)',
     color: '#f0b429',
   },
   grid: {
@@ -79,10 +73,11 @@ const styles = {
     gap: '20px',
   },
   card: {
-    backgroundColor: '#0f1318',
-    border: '1px solid #1c2230',
-    borderRadius: '12px',
+    background: 'linear-gradient(135deg, #0f1318 0%, #1c2230 100%)',
+    border: '1px solid rgba(28, 34, 48, 0.8)',
+    borderRadius: '16px',
     padding: '20px',
+    transition: 'all 0.3s ease',
   },
   cardFull: {
     gridColumn: 'span 2',
@@ -94,42 +89,46 @@ const styles = {
     margin: '0 0 16px 0',
   },
   chartContainer: {
-    height: '250px',
+    height: '280px',
   },
   statsGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(4, 1fr)',
     gap: '16px',
     marginBottom: '24px',
+    animation: 'fadeIn 0.4s ease-out',
   },
   statCard: {
-    backgroundColor: '#0f1318',
-    border: '1px solid #1c2230',
-    borderRadius: '12px',
-    padding: '16px',
+    background: 'linear-gradient(135deg, #0f1318 0%, #1c2230 100%)',
+    border: '1px solid rgba(28, 34, 48, 0.8)',
+    borderRadius: '16px',
+    padding: '20px',
+    transition: 'all 0.3s ease',
   },
   statLabel: {
     fontSize: '12px',
-    color: '#718096',
+    color: '#9ca3af',
     textTransform: 'uppercase' as const,
-    letterSpacing: '0.05em',
-    marginBottom: '8px',
+    letterSpacing: '0.08em',
+    marginBottom: '10px',
+    fontWeight: 600,
   },
   statValue: {
-    fontSize: '24px',
+    fontSize: '28px',
     fontWeight: 700,
     fontFamily: "'JetBrains Mono', monospace",
+    letterSpacing: '-0.02em',
   },
   legend: {
     display: 'flex',
     justifyContent: 'center',
-    gap: '20px',
-    marginTop: '12px',
+    gap: '24px',
+    marginTop: '16px',
   },
   legendItem: {
     display: 'flex',
     alignItems: 'center',
-    gap: '6px',
+    gap: '8px',
     fontSize: '13px',
     color: '#a0aec0',
   },
@@ -148,45 +147,38 @@ const styles = {
     textAlign: 'center' as const,
     color: '#718096',
   },
+  demoBanner: {
+    background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(240, 180, 41, 0.1) 100%)',
+    border: '1px solid rgba(245, 158, 11, 0.3)',
+    borderRadius: '12px',
+    padding: '14px 18px',
+    marginBottom: '20px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    animation: 'fadeIn 0.4s ease-out',
+  },
+  demoIcon: {
+    fontSize: '20px',
+  },
+  demoText: {
+    fontSize: '13px',
+    color: '#f59e0b',
+    margin: 0,
+    fontWeight: 500,
+  },
 };
 
 type TabType = 'overview' | 'pairs' | 'setups' | 'monthly';
 
 export default function AnalyticsPage() {
   const [user] = useState<User>(mockUser);
-  const [trades, setTrades] = useState<Trade[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { trades, isLoading, usingMockData, refresh } = useTrades();
   const [activeTab, setActiveTab] = useState<TabType>('overview');
 
-  const loadData = async () => {
-    setIsLoading(true);
-    try {
-      const notionReady = await isNotionConfigured();
-      if (notionReady) {
-        const realTrades = await fetchTradesFromNotion();
-        setTrades(realTrades);
-      } else {
-        const { mockTrades } = await import('../lib/mockData');
-        setTrades(mockTrades);
-      }
-    } catch (error) {
-      console.error('Error loading trades:', error);
-      const { mockTrades } = await import('../lib/mockData');
-      setTrades(mockTrades);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  // Calculate analytics data
   const analytics = useMemo(() => {
     if (trades.length === 0) return null;
 
-    // Overall stats
     const wins = trades.filter(t => t.outcome === 'WIN').length;
     const losses = trades.filter(t => t.outcome === 'LOSS').length;
     const breakeven = trades.filter(t => t.outcome === 'BREAKEVEN').length;
@@ -198,7 +190,6 @@ export default function AnalyticsPage() {
       ? trades.filter(t => t.outcome === 'LOSS').reduce((sum, t) => sum + t.pnlCurrency, 0) / losses 
       : 0;
 
-    // By Pair
     const pairStats = trades.reduce((acc, trade) => {
       const pair = trade.instrument;
       if (!acc[pair]) acc[pair] = { pair, trades: 0, wins: 0, pnl: 0 };
@@ -212,7 +203,6 @@ export default function AnalyticsPage() {
       .map(p => ({ ...p, winRate: Math.round((p.wins / p.trades) * 100) }))
       .sort((a, b) => b.pnl - a.pnl);
 
-    // By Setup
     const setupStats = trades.reduce((acc, trade) => {
       const setup = trade.setup || 'Unknown';
       if (!acc[setup]) acc[setup] = { setup, trades: 0, wins: 0, pnl: 0 };
@@ -226,7 +216,6 @@ export default function AnalyticsPage() {
       .map(s => ({ ...s, winRate: Math.round((s.wins / s.trades) * 100) }))
       .sort((a, b) => b.pnl - a.pnl);
 
-    // Monthly data
     const monthlyStats = trades.reduce((acc, trade) => {
       const date = new Date(trade.exitTime);
       const month = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
@@ -241,23 +230,24 @@ export default function AnalyticsPage() {
       .map(m => ({ ...m, winRate: Math.round((m.wins / m.trades) * 100) }))
       .sort((a, b) => a.month.localeCompare(b.month));
 
-    return {
-      wins,
-      losses,
-      breakeven,
-      totalPnl,
-      avgWin,
-      avgLoss,
-      pairData,
-      setupData,
-      monthlyData,
-    };
+    return { wins, losses, breakeven, totalPnl, avgWin, avgLoss, pairData, setupData, monthlyData };
   }, [trades]);
 
-  if (isLoading) {
+  if (isLoading && trades.length === 0) {
     return (
-      <AppShell user={user} onTradeCreated={loadData}>
-        <div style={styles.loading}>Loading analytics...</div>
+      <AppShell user={user}>
+        <div style={styles.header}>
+          <h1 style={styles.title}>Analytics</h1>
+          <p style={styles.subtitle}>Detailed trading performance analysis</p>
+        </div>
+        <div style={styles.statsGrid}>
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} style={styles.statCard}>
+              <SkeletonChart height={80} />
+            </div>
+          ))}
+        </div>
+        <SkeletonChart height={300} />
       </AppShell>
     );
   }
@@ -274,13 +264,19 @@ export default function AnalyticsPage() {
   }
 
   return (
-    <AppShell user={user}>
+    <AppShell user={user} onTradeCreated={refresh}>
       <div style={styles.header}>
         <h1 style={styles.title}>Analytics</h1>
         <p style={styles.subtitle}>Detailed trading performance analysis</p>
       </div>
 
-      {/* Overview Stats */}
+      {usingMockData && (
+        <div style={styles.demoBanner}>
+          <span style={styles.demoIcon}>⚡</span>
+          <p style={styles.demoText}>Demo Mode: Add NOTION_TOKEN to use real data</p>
+        </div>
+      )}
+
       <div style={styles.statsGrid}>
         <div style={styles.statCard}>
           <div style={styles.statLabel}>Total Trades</div>
@@ -300,7 +296,7 @@ export default function AnalyticsPage() {
         </div>
         <div style={styles.statCard}>
           <div style={styles.statLabel}>Avg Win/Loss</div>
-          <div style={{ ...styles.statValue, fontSize: '18px' }}>
+          <div style={{ ...styles.statValue, fontSize: '20px' }}>
             <span style={{ color: '#22c55e' }}>{formatCurrency(analytics.avgWin)}</span>
             <span style={{ color: '#718096', margin: '0 4px' }}>/</span>
             <span style={{ color: '#ef4444' }}>{formatCurrency(analytics.avgLoss)}</span>
@@ -308,15 +304,11 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      {/* Tabs */}
       <div style={styles.tabs}>
         {(['overview', 'pairs', 'setups', 'monthly'] as TabType[]).map((tab) => (
           <button
             key={tab}
-            style={{
-              ...styles.tab,
-              ...(activeTab === tab ? styles.tabActive : {}),
-            }}
+            style={{ ...styles.tab, ...(activeTab === tab ? styles.tabActive : {}) }}
             onClick={() => setActiveTab(tab)}
           >
             {tab.charAt(0).toUpperCase() + tab.slice(1)}
@@ -324,7 +316,6 @@ export default function AnalyticsPage() {
         ))}
       </div>
 
-      {/* Tab Content */}
       {activeTab === 'overview' && (
         <div style={styles.grid}>
           <div style={styles.card}>
@@ -338,45 +329,20 @@ export default function AnalyticsPage() {
                       { name: 'Losses', value: analytics.losses, color: COLORS.loss },
                       { name: 'Breakeven', value: analytics.breakeven, color: COLORS.breakeven },
                     ]}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
-                    paddingAngle={5}
-                    dataKey="value"
+                    cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value"
                   >
-                    {[
-                      { color: COLORS.win },
-                      { color: COLORS.loss },
-                      { color: COLORS.breakeven },
-                    ].map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    {[{ color: COLORS.win }, { color: COLORS.loss }, { color: COLORS.breakeven }].map((e, i) => (
+                      <Cell key={i} fill={e.color} />
                     ))}
                   </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#0f1318',
-                      border: '1px solid #1c2230',
-                      borderRadius: '8px',
-                    }}
-                    labelStyle={{ color: '#e2e8f0' }}
-                  />
+                  <Tooltip contentStyle={{ backgroundColor: '#0f1318', border: '1px solid #1c2230', borderRadius: '8px' }} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
             <div style={styles.legend}>
-              <div style={styles.legendItem}>
-                <div style={{ ...styles.legendDot, backgroundColor: COLORS.win }} />
-                Wins ({analytics.wins})
-              </div>
-              <div style={styles.legendItem}>
-                <div style={{ ...styles.legendDot, backgroundColor: COLORS.loss }} />
-                Losses ({analytics.losses})
-              </div>
-              <div style={styles.legendItem}>
-                <div style={{ ...styles.legendDot, backgroundColor: COLORS.breakeven }} />
-                Breakeven ({analytics.breakeven})
-              </div>
+              <div style={styles.legendItem}><div style={{ ...styles.legendDot, backgroundColor: COLORS.win }} />Wins ({analytics.wins})</div>
+              <div style={styles.legendItem}><div style={{ ...styles.legendDot, backgroundColor: COLORS.loss }} />Losses ({analytics.losses})</div>
+              <div style={styles.legendItem}><div style={{ ...styles.legendDot, backgroundColor: COLORS.breakeven }} />Breakeven ({analytics.breakeven})</div>
             </div>
           </div>
 
@@ -384,27 +350,16 @@ export default function AnalyticsPage() {
             <h3 style={styles.cardTitle}>P&L by Outcome</h3>
             <div style={styles.chartContainer}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={[
-                    { name: 'Wins', pnl: analytics.avgWin * analytics.wins },
-                    { name: 'Losses', pnl: analytics.avgLoss * analytics.losses },
-                  ]}
-                  layout="vertical"
-                >
+                <BarChart data={[
+                  { name: 'Wins', pnl: analytics.avgWin * analytics.wins },
+                  { name: 'Losses', pnl: analytics.avgLoss * analytics.losses },
+                ]} layout="vertical">
                   <CartesianGrid strokeDasharray="3 3" stroke="#1c2230" />
                   <XAxis type="number" stroke="#4a5568" tickFormatter={(v) => `$${v}`} />
                   <YAxis dataKey="name" type="category" stroke="#a0aec0" width={70} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#0f1318',
-                      border: '1px solid #1c2230',
-                      borderRadius: '8px',
-                    }}
-                    formatter={(v: number) => formatCurrency(v)}
-                  />
+                  <Tooltip contentStyle={{ backgroundColor: '#0f1318', border: '1px solid #1c2230', borderRadius: '8px' }} formatter={(v: number) => formatCurrency(v)} />
                   <Bar dataKey="pnl" radius={[0, 4, 4, 0]}>
-                    <Cell fill={COLORS.win} />
-                    <Cell fill={COLORS.loss} />
+                    <Cell fill={COLORS.win} /><Cell fill={COLORS.loss} />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -422,20 +377,9 @@ export default function AnalyticsPage() {
                 <CartesianGrid strokeDasharray="3 3" stroke="#1c2230" />
                 <XAxis dataKey="pair" stroke="#a0aec0" />
                 <YAxis stroke="#4a5568" tickFormatter={(v) => `$${v}`} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#0f1318',
-                    border: '1px solid #1c2230',
-                    borderRadius: '8px',
-                  }}
-                  formatter={(v: number, n: string) => 
-                    n === 'pnl' ? formatCurrency(v) : `${v}%`
-                  }
-                />
+                <Tooltip contentStyle={{ backgroundColor: '#0f1318', border: '1px solid #1c2230', borderRadius: '8px' }} formatter={(v: number, n: string) => n === 'pnl' ? formatCurrency(v) : `${v}%`} />
                 <Bar dataKey="pnl" name="P&L" radius={[4, 4, 0, 0]}>
-                  {analytics.pairData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.pnl >= 0 ? COLORS.win : COLORS.loss} />
-                  ))}
+                  {analytics.pairData.map((e, i) => <Cell key={i} fill={e.pnl >= 0 ? COLORS.win : COLORS.loss} />)}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -452,18 +396,9 @@ export default function AnalyticsPage() {
                 <CartesianGrid strokeDasharray="3 3" stroke="#1c2230" />
                 <XAxis type="number" stroke="#4a5568" tickFormatter={(v) => `$${v}`} />
                 <YAxis dataKey="setup" type="category" stroke="#a0aec0" width={120} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#0f1318',
-                    border: '1px solid #1c2230',
-                    borderRadius: '8px',
-                  }}
-                  formatter={(v: number) => formatCurrency(v)}
-                />
+                <Tooltip contentStyle={{ backgroundColor: '#0f1318', border: '1px solid #1c2230', borderRadius: '8px' }} formatter={(v: number) => formatCurrency(v)} />
                 <Bar dataKey="pnl" name="P&L" radius={[0, 4, 4, 0]}>
-                  {analytics.setupData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.pnl >= 0 ? COLORS.gold : COLORS.loss} />
-                  ))}
+                  {analytics.setupData.map((e, i) => <Cell key={i} fill={e.pnl >= 0 ? COLORS.gold : COLORS.loss} />)}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -478,35 +413,10 @@ export default function AnalyticsPage() {
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={analytics.monthlyData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1c2230" />
-                <XAxis 
-                  dataKey="month" 
-                  stroke="#a0aec0" 
-                  tickFormatter={(v) => {
-                    const [year, month] = v.split('-');
-                    return `${month}/${year.slice(2)}`;
-                  }}
-                />
+                <XAxis dataKey="month" stroke="#a0aec0" tickFormatter={(v) => { const [y, m] = v.split('-'); return `${m}/${y.slice(2)}`; }} />
                 <YAxis stroke="#4a5568" tickFormatter={(v) => `$${v}`} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#0f1318',
-                    border: '1px solid #1c2230',
-                    borderRadius: '8px',
-                  }}
-                  formatter={(v: number, n: string) =>
-                    n === 'pnl' ? formatCurrency(v) : `${v}%`
-                  }
-                  labelFormatter={(l) => `Month: ${l}`}
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="pnl" 
-                  name="P&L" 
-                  stroke={COLORS.gold} 
-                  strokeWidth={2}
-                  dot={{ r: 4, fill: COLORS.gold }}
-                  activeDot={{ r: 6 }}
-                />
+                <Tooltip contentStyle={{ backgroundColor: '#0f1318', border: '1px solid #1c2230', borderRadius: '8px' }} formatter={(v: number, n: string) => n === 'pnl' ? formatCurrency(v) : `${v}%`} />
+                <Line type="monotone" dataKey="pnl" name="P&L" stroke={COLORS.gold} strokeWidth={2} dot={{ r: 4, fill: COLORS.gold }} activeDot={{ r: 6 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
