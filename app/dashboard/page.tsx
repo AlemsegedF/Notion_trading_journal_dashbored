@@ -2,15 +2,22 @@
 
 /**
  * Dashboard Page
- * Main dashboard view with all KPI cards and data visualization
+ * Main dashboard view with real Notion data
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { User, Trade, Strategy, KpiMetrics, PerformanceMetrics, EquityCurvePoint } from '../types';
+
+// Real data fetching from Notion
 import {
-  mockUser,
-  mockTrades,
-  mockStrategies,
+  fetchTradesFromNotion,
+  fetchTodaysTradesFromNotion,
+  fetchStrategiesFromNotion,
+  isNotionConfigured,
+} from '../lib/notionData';
+
+// Calculation utilities (work with any Trade[] data)
+import {
   calculateTotalReturn,
   calculateWinRate,
   calculateWinRateLastN,
@@ -22,7 +29,13 @@ import {
   calculateMaxDrawdown,
   calculateAvgTradeDuration,
   generateEquityCurve,
-  fetchTodaysTrades,
+} from '../lib/mockData';
+
+// Fallback mock data (used if Notion is not configured)
+import {
+  mockUser,
+  mockTrades,
+  mockStrategies,
 } from '../lib/mockData';
 
 // Components
@@ -46,6 +59,57 @@ const styles = {
     color: '#e2e8f0',
     fontSize: '16px',
   },
+  errorContainer: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minHeight: '100vh',
+    backgroundColor: '#0a0d12',
+    color: '#e2e8f0',
+    padding: '40px',
+    textAlign: 'center' as const,
+  },
+  errorTitle: {
+    fontSize: '20px',
+    fontWeight: 600,
+    color: '#ef4444',
+    marginBottom: '12px',
+  },
+  errorMessage: {
+    fontSize: '14px',
+    color: '#a0aec0',
+    maxWidth: '500px',
+    marginBottom: '24px',
+  },
+  retryButton: {
+    padding: '10px 20px',
+    backgroundColor: '#f0b429',
+    color: '#0a0d12',
+    border: 'none',
+    borderRadius: '8px',
+    fontSize: '14px',
+    fontWeight: 600,
+    cursor: 'pointer',
+  },
+  banner: {
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    border: '1px solid rgba(245, 158, 11, 0.3)',
+    borderRadius: '8px',
+    padding: '12px 16px',
+    marginBottom: '20px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+  },
+  bannerIcon: {
+    fontSize: '18px',
+  },
+  bannerText: {
+    fontSize: '13px',
+    color: '#f59e0b',
+    margin: 0,
+  },
   mainGrid: {
     display: 'grid',
     gridTemplateColumns: '1fr 380px',
@@ -62,9 +126,6 @@ const styles = {
     flexDirection: 'column' as const,
     gap: '24px',
   },
-  fullWidthSection: {
-    marginTop: '24px',
-  },
 };
 
 // ─── COMPONENT ───────────────────────────────────────────────────────────────
@@ -72,23 +133,67 @@ const styles = {
 export default function DashboardPage() {
   // State for data
   const [user] = useState<User>(mockUser);
-  const [trades] = useState<Trade[]>(mockTrades);
-  const [strategies] = useState<Strategy[]>(mockStrategies);
+  const [trades, setTrades] = useState<Trade[]>([]);
+  const [strategies, setStrategies] = useState<Strategy[]>([]);
   const [todayTrades, setTodayTrades] = useState<Trade[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [usingMockData, setUsingMockData] = useState(false);
 
-  // Simulate data loading
+  // Fetch data from Notion
   useEffect(() => {
     const loadData = async () => {
-      // In a real app, these would be API calls
-      const todays = await fetchTodaysTrades();
-      setTodayTrades(todays);
-      setIsLoading(false);
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        // Check if Notion is configured
+        const notionReady = await isNotionConfigured();
+
+        if (!notionReady) {
+          console.warn('Notion not configured - falling back to mock data');
+          setUsingMockData(true);
+          setTrades(mockTrades);
+          setStrategies(mockStrategies);
+          
+          // Get today's trades from mock
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const todays = mockTrades.filter(trade => {
+            const tradeDate = new Date(trade.exitTime);
+            tradeDate.setHours(0, 0, 0, 0);
+            return tradeDate.getTime() === today.getTime();
+          });
+          setTodayTrades(todays);
+          setIsLoading(false);
+          return;
+        }
+
+        // Fetch real data from Notion in parallel
+        const [allTrades, todaysTrades, allStrategies] = await Promise.all([
+          fetchTradesFromNotion(),
+          fetchTodaysTradesFromNotion(),
+          fetchStrategiesFromNotion(),
+        ]);
+
+        setTrades(allTrades);
+        setTodayTrades(todaysTrades);
+        setStrategies(allStrategies);
+        setUsingMockData(false);
+      } catch (err) {
+        console.error('Error loading data:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load data');
+        
+        // Fallback to mock data on error
+        setUsingMockData(true);
+        setTrades(mockTrades);
+        setStrategies(mockStrategies);
+      } finally {
+        setIsLoading(false);
+      }
     };
 
-    // Simulate slight delay for realistic loading experience
-    const timer = setTimeout(loadData, 300);
-    return () => clearTimeout(timer);
+    loadData();
   }, []);
 
   // Calculate KPI metrics
@@ -96,8 +201,9 @@ export default function DashboardPage() {
     const startingCapital = 50000;
     const totalReturn = calculateTotalReturn(trades, startingCapital);
     
-    // Mock previous period return (for comparison)
-    const previousReturn = totalReturn * 0.8; // Assume 80% of current for demo
+    // Calculate change vs previous period
+    // For real data, you might want to compare month-over-month or week-over-week
+    const previousReturn = totalReturn * 0.9; // Placeholder
     const change = totalReturn - previousReturn;
 
     const overallWinRate = calculateWinRate(trades);
@@ -146,8 +252,12 @@ export default function DashboardPage() {
 
   // Handle new trade button click
   const handleNewTrade = () => {
-    // TODO: Open trade entry modal or navigate to trade entry page
-    alert('New Trade button clicked! In production, this would open a trade entry form.');
+    alert('New Trade functionality coming soon! This will open a trade entry form.');
+  };
+
+  // Handle retry on error
+  const handleRetry = () => {
+    window.location.reload();
   };
 
   if (isLoading) {
@@ -158,8 +268,30 @@ export default function DashboardPage() {
     );
   }
 
+  if (error && trades.length === 0) {
+    return (
+      <div style={styles.errorContainer}>
+        <h2 style={styles.errorTitle}>Error Loading Data</h2>
+        <p style={styles.errorMessage}>{error}</p>
+        <button style={styles.retryButton} onClick={handleRetry}>
+          Retry
+        </button>
+      </div>
+    );
+  }
+
   return (
     <AppShell user={user} onNewTrade={handleNewTrade}>
+      {usingMockData && (
+        <div style={styles.banner}>
+          <span style={styles.bannerIcon}>⚠️</span>
+          <p style={styles.bannerText}>
+            Using demo data. Connect your Notion database to see real trades. 
+            Add NOTION_TOKEN and NOTION_DATABASE_ID environment variables in Vercel.
+          </p>
+        </div>
+      )}
+
       <DashboardHeader 
         user={user} 
         todayTradeCount={todayTrades.length} 

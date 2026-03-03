@@ -2,12 +2,13 @@
 
 /**
  * Strategies Page
- * Manage and analyze trading strategies
+ * Manage and analyze trading strategies from Notion data
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, Strategy } from '../types';
-import { mockUser, mockStrategies } from '../lib/mockData';
+import { mockUser } from '../lib/mockData';
+import { fetchStrategiesFromNotion, isNotionConfigured } from '../lib/notionData';
 import AppShell from '../components/AppShell';
 import { formatCurrency, getValueColor } from '../lib/utils';
 
@@ -24,6 +25,24 @@ const styles = {
   subtitle: {
     fontSize: '14px',
     color: '#718096',
+    margin: 0,
+  },
+  banner: {
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    border: '1px solid rgba(245, 158, 11, 0.3)',
+    borderRadius: '8px',
+    padding: '12px 16px',
+    marginBottom: '20px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+  },
+  bannerIcon: {
+    fontSize: '18px',
+  },
+  bannerText: {
+    fontSize: '13px',
+    color: '#f59e0b',
     margin: 0,
   },
   grid: {
@@ -78,15 +97,63 @@ const styles = {
     textTransform: 'uppercase' as const,
     letterSpacing: '0.05em',
   },
+  loading: {
+    padding: '60px',
+    textAlign: 'center' as const,
+    color: '#718096',
+  },
 };
 
 export default function StrategiesPage() {
   const [user] = useState<User>(mockUser);
-  const [strategies] = useState<Strategy[]>(mockStrategies);
+  const [strategies, setStrategies] = useState<Strategy[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [usingMockData, setUsingMockData] = useState(false);
+
+  useEffect(() => {
+    const loadData = async () => {
+      setIsLoading(true);
+
+      try {
+        const notionReady = await isNotionConfigured();
+
+        if (!notionReady) {
+          setUsingMockData(true);
+          const { mockStrategies } = await import('../lib/mockData');
+          setStrategies(mockStrategies);
+        } else {
+          const realStrategies = await fetchStrategiesFromNotion();
+          setStrategies(realStrategies);
+          setUsingMockData(false);
+        }
+      } catch (error) {
+        console.error('Error loading strategies:', error);
+        const { mockStrategies } = await import('../lib/mockData');
+        setStrategies(mockStrategies);
+        setUsingMockData(true);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadData();
+  }, []);
 
   const handleNewTrade = () => {
-    alert('New Trade button clicked!');
+    alert('New Trade functionality coming soon!');
   };
+
+  if (isLoading) {
+    return (
+      <AppShell user={user} onNewTrade={handleNewTrade}>
+        <div style={styles.header}>
+          <h1 style={styles.title}>Strategies</h1>
+          <p style={styles.subtitle}>Manage and analyze your trading strategies</p>
+        </div>
+        <div style={styles.loading}>Loading strategies...</div>
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell user={user} onNewTrade={handleNewTrade}>
@@ -94,6 +161,15 @@ export default function StrategiesPage() {
         <h1 style={styles.title}>Strategies</h1>
         <p style={styles.subtitle}>Manage and analyze your trading strategies</p>
       </div>
+
+      {usingMockData && (
+        <div style={styles.banner}>
+          <span style={styles.bannerIcon}>⚠️</span>
+          <p style={styles.bannerText}>
+            Using demo data. Connect your Notion database to see real strategies.
+          </p>
+        </div>
+      )}
 
       <div style={styles.grid}>
         {strategies.map((strategy) => (
