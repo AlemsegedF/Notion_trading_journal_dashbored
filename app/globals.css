@@ -1,19 +1,177 @@
-* {
+/**
+ * Global Styles for TradeJournal Pro
+ * Dark theme with gold accents
+ */
+
+/* ─── CSS RESET & BASE ─────────────────────────────────────────────────────── */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
   margin: 0;
   padding: 0;
-  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
   background-color: #0a0d12;
   color: #e2e8f0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  min-height: 100vh;
 }
 
-html {
-  scroll-behavior: smooth;
+/* ─── TYPOGRAPHY ───────────────────────────────────────────────────────────── */
+
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 600;
+  line-height: 1.2;
+  color: #e2e8f0;
+}
+
+code, pre {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+}
+
+/* ─── SCROLLBAR ────────────────────────────────────────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0f1318;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1c2230;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #2d3748;
+}
+
+/* ─── SELECTION ────────────────────────────────────────────────────────────── */
+
+::selection {
+  background-color: rgba(240, 180, 41, 0.3);
+  color: #e2e8f0;
+}
+
+/* ─── LINKS ────────────────────────────────────────────────────────────────── */
+
+a {
+  color: #f0b429;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+a:hover {
+  color: #f5c446;
+}
+
+/* ─── BUTTONS ──────────────────────────────────────────────────────────────── */
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+button:focus-visible {
+  outline: 2px solid #f0b429;
+  outline-offset: 2px;
+}
+
+/* ─── FORM ELEMENTS ────────────────────────────────────────────────────────── */
+
+input, select, textarea {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+/* ─── RECHARTS OVERRIDES ───────────────────────────────────────────────────── */
+
+.recharts-tooltip-wrapper {
+  outline: none;
+}
+
+/* ─── ANIMATIONS ───────────────────────────────────────────────────────────── */
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.animate-slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+
+/* ─── UTILITY CLASSES ──────────────────────────────────────────────────────── */
+
+.text-green {
+  color: #22c55e;
+}
+
+.text-red {
+  color: #ef4444;
+}
+
+.text-gold {
+  color: #f0b429;
+}
+
+.text-muted {
+  color: #718096;
+}
+
+.bg-green-soft {
+  background-color: rgba(34, 197, 94, 0.1);
+}
+
+.bg-red-soft {
+  background-color: rgba(239, 68, 68, 0.1);
+}
+
+.bg-gold-soft {
+  background-color: rgba(240, 180, 41, 0.1);
+}
+
+/* ─── RESPONSIVE UTILITIES ─────────────────────────────────────────────────── */
+
+@media (max-width: 1024px) {
+  /* Tablet adjustments */
+}
+
+@media (max-width: 768px) {
+  /* Mobile adjustments - sidebar would collapse to hamburger menu */
 }
