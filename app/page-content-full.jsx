@@ -212,7 +212,7 @@ export default function TradingDashboard() {
             <StatCard label="Avg R:R" value={`${avgR}R`} color={C.blue} />
             <StatCard label="Trades" value={trades.length} sub="Total" />
             <StatCard label="SOP Violations" value={violations} sub={`${trades.length-violations} clean`} color={violations===0?C.green:C.red} />
-            <StatCard label="Best Trade" value={`+${Math.max(...trades.map(t=>t.rMultiple))}R`} color={C.accent} glow />
+            <StatCard label="Best Trade" value={trades.length > 0 ? `+${Math.max(...trades.map(t=>t.rMultiple))}R` : "N/A"} color={C.accent} glow />
           </div>
 
           {/* Equity + Pie */}
@@ -333,8 +333,8 @@ export default function TradingDashboard() {
           </div>
 
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
-            <StatCard label="Total R Earned" value={fmtR(trades.reduce((s,t)=>s+t.rMultiple,0))} color={C.green} glow />
-            <StatCard label="Max Drawdown" value={`$${Math.abs(Math.min(...equity.map(e=>e.balance))).toFixed(0)}`} color={C.red} />
+            <StatCard label="Total R Earned" value={trades.length > 0 ? fmtR(trades.reduce((s,t)=>s+t.rMultiple,0)) : "0R"} color={C.green} glow />
+            <StatCard label="Max Drawdown" value={trades.length > 0 ? `$${Math.abs(Math.min(...equity.map(e=>e.balance)))?.toFixed(0) || 0}` : "N/A"} color={C.red} />
             <StatCard label="Avg Win (R)" value={`+${avgWinR}R`} color={C.green} />
             <StatCard label="Avg Loss (R)" value={`-${avgLossR}R`} color={C.red} />
           </div>
