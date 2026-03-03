@@ -39,15 +39,15 @@ function computeEquityCurve(trades) {
 function groupBy(trades, keyFn) {
   const map = {};
   trades.forEach(t => {
-    const k = keyFn(t);
+    const k = keyFn(t) || "Unknown";
     if (!map[k]) map[k] = { label: k, trades:[], wins:0, total:0, pnl:0, r:0 };
     map[k].trades.push(t);
     map[k].total++;
-    map[k].pnl += t.pnl;
-    map[k].r   += t.rMultiple;
+    map[k].pnl += t.pnl || 0;
+    map[k].r   += t.rMultiple || 0;
     if (t.outcome === "Win") map[k].wins++;
   });
-  return Object.values(map).map(g => ({ ...g, winRate: Math.round(g.wins/g.total*100), avgR: +(g.r/g.total).toFixed(2) }));
+  return Object.values(map).map(g => ({ ...g, winRate: g.total > 0 ? Math.round(g.wins/g.total*100) : 0, avgR: g.total > 0 ? +(g.r/g.total).toFixed(2) : 0 }));
 }
 
 const TT = ({ active, payload, label }) => {
@@ -116,16 +116,34 @@ export default function TradingDashboard() {
 
   const monthlyData = useMemo(()=>{
     try {
+      if (!trades || trades.length === 0) return [];
       const m = {};
-      trades.filter(t=>t.date).forEach(t=>{ const k=month(t.date); if(!m[k]) m[k]={month:k,pnl:0,trades:0,wins:0}; m[k].pnl+=t.pnl; m[k].trades++; if(t.outcome==="Win") m[k].wins++; });
+      trades.filter(t=>t && t.date).forEach(t=>{ 
+        try {
+          const k=month(t.date); 
+          if(!m[k]) m[k]={month:k,pnl:0,trades:0,wins:0}; 
+          m[k].pnl += t.pnl || 0; 
+          m[k].trades++; 
+          if(t.outcome==="Win") m[k].wins++; 
+        } catch(err) { console.error("monthlyData trade error:", err); }
+      });
       return Object.values(m).map(v=>({...v, winRate:v.trades>0?Math.round(v.wins/v.trades*100):0}));
     } catch(e) { console.error("monthlyData:",e); return []; }
   },[trades]);
 
   const weeklyData = useMemo(()=>{
     try {
+      if (!trades || trades.length === 0) return [];
       const w = {};
-      trades.filter(t=>t.date).forEach(t=>{ const k=week(t.date); if(!w[k]) w[k]={week:k,pnl:0,trades:0,wins:0}; w[k].pnl+=t.pnl; w[k].trades++; if(t.outcome==="Win") w[k].wins++; });
+      trades.filter(t=>t && t.date).forEach(t=>{ 
+        try {
+          const k=week(t.date); 
+          if(!w[k]) w[k]={week:k,pnl:0,trades:0,wins:0}; 
+          w[k].pnl += t.pnl || 0; 
+          w[k].trades++; 
+          if(t.outcome==="Win") w[k].wins++; 
+        } catch(err) { console.error("weeklyData trade error:", err); }
+      });
       return Object.values(w).map(v=>({...v,winRate:v.trades>0?Math.round(v.wins/v.trades*100):0}));
     } catch(e) { console.error("weeklyData:",e); return []; }
   },[trades]);
