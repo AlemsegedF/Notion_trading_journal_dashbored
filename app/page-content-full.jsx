@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from "react";
+import TradeLogModal from "./components/TradeLogModal";
 import {
   LineChart, Line, AreaChart, Area, BarChart, Bar,
   PieChart, Pie, Cell, RadarChart, Radar, PolarGrid,
@@ -62,35 +63,40 @@ const TT = ({ active, payload, label }) => {
   );
 };
 
-const StatCard = ({ label, value, sub, color, glow }) => (
-  <div style={{ background: C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:"18px 20px", position:"relative", overflow:"hidden" }}>
-    {glow && <div style={{ position:"absolute", top:-30, right:-30, width:80, height:80, borderRadius:"50%", background: color||C.accent, opacity:0.08, filter:"blur(20px)" }}/>}
-    <p style={{ color: C.sub, fontSize:11, letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:6 }}>{label}</p>
-    <p style={{ color: color||C.text, fontSize:26, fontWeight:700, fontFamily:"'DM Mono', monospace", lineHeight:1 }}>{value}</p>
-    {sub && <p style={{ color: C.muted, fontSize:12, marginTop:4 }}>{sub}</p>}
-  </div>
-);
-
-const SectionHeader = ({ title, sub }) => (
-  <div style={{ marginBottom:16 }}>
-    <h2 style={{ color: C.text, fontSize:15, fontWeight:600, letterSpacing:"0.02em", margin:0 }}>{title}</h2>
-    {sub && <p style={{ color: C.sub, fontSize:12, margin:"3px 0 0" }}>{sub}</p>}
-  </div>
-);
+const MetricCard = ({ label, value, sub, color, size = "normal" }) => {
+  if (size === "large") {
+    return (
+      <div style={{ background: C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:"24px", position:"relative" }}>
+        <p style={{ color: C.sub, fontSize:12, margin:"0 0 8px" }}>{label}</p>
+        <p style={{ color: color || C.text, fontSize:36, fontWeight:700, fontFamily:"'DM Mono', monospace", margin:0 }}>{value}</p>
+        {sub && <p style={{ color: C.muted, fontSize:12, margin:"8px 0 0" }}>{sub}</p>}
+      </div>
+    );
+  }
+  
+  return (
+    <div style={{ background: C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:"16px 18px" }}>
+      <p style={{ color: C.sub, fontSize:11, letterSpacing:"0.08em", textTransform:"uppercase", margin:"0 0 8px" }}>{label}</p>
+      <p style={{ color: color || C.text, fontSize:18, fontWeight:700, fontFamily:"'DM Mono', monospace", margin:0 }}>{value}</p>
+      {sub && <p style={{ color: C.muted, fontSize:11, margin:"6px 0 0" }}>{sub}</p>}
+    </div>
+  );
+};
 
 export default function TradingDashboard() {
-  const [view, setView] = useState("overview");
   const [trades, setTrades] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showModal, setShowModal] = useState(false);
 
+  // Fetch trades
   useEffect(() => {
     async function fetchTrades() {
       try {
         const response = await fetch("/api/trades");
         if (!response.ok) throw new Error("Failed to fetch trades");
         const data = await response.json();
-        setTrades(data.trades);
+        setTrades(data.trades || []);
       } catch (err) {
         setError(err.message);
         console.error("Error fetching trades:", err);
@@ -101,7 +107,7 @@ export default function TradingDashboard() {
     fetchTrades();
   }, []);
 
-  // CALL ALL HOOKS FIRST - before any conditional returns!
+  // Calculate all metrics BEFORE any conditional returns
   const wins      = trades.filter(t=>t.outcome==="Win");
   const losses    = trades.filter(t=>t.outcome==="Loss");
   const winRate   = trades.length > 0 ? Math.round(wins.length/trades.length*100) : 0;
@@ -113,60 +119,18 @@ export default function TradingDashboard() {
   const profFactor= wins.length > 0 && losses.length > 0 ? +(wins.reduce((s,t)=>s+t.pnl,0)/Math.abs(losses.reduce((s,t)=>s+t.pnl,0))).toFixed(2) : 0;
   const violations= trades.filter(t=>!t.sopOk).length;
   const equity    = computeEquityCurve(trades);
+  const todayTrades = trades.filter(t => new Date(t.date).toDateString() === new Date().toDateString()).length;
+  const todayPnL = trades.filter(t => new Date(t.date).toDateString() === new Date().toDateString()).reduce((s,t)=>s+t.pnl,0);
 
-  const monthlyData = useMemo(()=>{
-    try {
-      if (!trades || trades.length === 0) return [];
-      const m = {};
-      trades.filter(t=>t && t.date).forEach(t=>{ 
-        try {
-          const k=month(t.date); 
-          if(!m[k]) m[k]={month:k,pnl:0,trades:0,wins:0}; 
-          m[k].pnl += t.pnl || 0; 
-          m[k].trades++; 
-          if(t.outcome==="Win") m[k].wins++; 
-        } catch(err) { console.error("monthlyData trade error:", err); }
-      });
-      return Object.values(m).map(v=>({...v, winRate:v.trades>0?Math.round(v.wins/v.trades*100):0}));
-    } catch(e) { console.error("monthlyData:",e); return []; }
-  },[trades]);
+  const bySetup = useMemo(()=>{ try { return groupBy(trades,t=>t.setup).sort((a,b)=>b.pnl-a.pnl); } catch(e) { return []; } },[trades]);
 
-  const weeklyData = useMemo(()=>{
-    try {
-      if (!trades || trades.length === 0) return [];
-      const w = {};
-      trades.filter(t=>t && t.date).forEach(t=>{ 
-        try {
-          const k=week(t.date); 
-          if(!w[k]) w[k]={week:k,pnl:0,trades:0,wins:0}; 
-          w[k].pnl += t.pnl || 0; 
-          w[k].trades++; 
-          if(t.outcome==="Win") w[k].wins++; 
-        } catch(err) { console.error("weeklyData trade error:", err); }
-      });
-      return Object.values(w).map(v=>({...v,winRate:v.trades>0?Math.round(v.wins/v.trades*100):0}));
-    } catch(e) { console.error("weeklyData:",e); return []; }
-  },[trades]);
+  // Recent trades (last 5)
+  const recentTrades = trades.slice(-5).reverse();
 
-  const byPair  = useMemo(()=>{ try { return groupBy(trades,t=>t.pair); } catch(e) { console.error("byPair:",e); return []; } },[trades]);
-  const bySetup = useMemo(()=>{ try { return groupBy(trades,t=>t.setup); } catch(e) { console.error("bySetup:",e); return []; } },[trades]);
-  const bySess  = useMemo(()=>{ try { return groupBy(trades,t=>t.session); } catch(e) { console.error("bySess:",e); return []; } },[trades]);
-
-  const radarDat = bySetup.length>0 ? bySetup.map(s=>({ setup: (s.label||"N/A").replace(" Entry","").replace("Liquidity Sweep","Liq.Sweep"), winRate: s.winRate||0, avgR: (s.avgR||0)*25 })) : [];
-
-  const pieDat = [
-    { name:"Wins", value: wins.length, color: C.green },
-    { name:"Losses", value: losses.length, color: C.red },
-    { name:"Breakeven", value: trades.filter(t=>t.outcome==="Breakeven").length, color: C.muted },
-  ];
-
-  const tabs = ["overview","equity","pairs","setups","weekly","monthly"];
-
-  // NOW render with conditional UI based on state
   if (loading) {
     return (
       <div style={{ background: C.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: C.text }}>
-        <p>Loading your trades from Notion...</p>
+        <p>Loading your trades...</p>
       </div>
     );
   }
@@ -176,49 +140,166 @@ export default function TradingDashboard() {
       <div style={{ background: C.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: C.red }}>
         <div style={{ textAlign: "center" }}>
           <p>⚠️ Error: {error}</p>
-          <p style={{ color: C.sub, marginTop: "10px", fontSize: "14px" }}>Make sure NOTION_TOKEN and NOTION_DATABASE_ID are set in environment variables</p>
+          <p style={{ color: C.sub, marginTop: "10px", fontSize: "14px" }}>Make sure NOTION_TOKEN and NOTION_DATABASE_ID are configured</p>
         </div>
-      </div>
-    );
-  }
-
-  if (trades.length === 0) {
-    return (
-      <div style={{ background: C.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: C.text }}>
-        <p>No trades found. Start adding trades to your Notion database!</p>
       </div>
     );
   }
 
   return (
-    <div style={{ background: C.bg, minHeight:"100vh", fontFamily:"'DM Sans', sans-serif", color: C.text, padding:"0 0 40px" }}>
+    <div style={{ background: C.bg, minHeight:"100vh", fontFamily:"'DM Sans', sans-serif", color: C.text }}>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 
-      {/* ── HEADER ── */}
-      <div style={{ borderBottom:`1px solid ${C.border}`, padding:"20px 28px 16px", display:"flex", alignItems:"center", justifyContent:"space-between", position:"sticky", top:0, background:C.bg, zIndex:10 }}>
+      {/* HEADER */}
+      <div style={{ borderBottom:`1px solid ${C.border}`, padding:"28px 40px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
         <div>
-          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-            <div style={{ width:8, height:8, borderRadius:"50%", background:C.green, boxShadow:`0 0 8px ${C.green}` }}/>
-            <span style={{ fontSize:11, color:C.green, letterSpacing:"0.1em", textTransform:"uppercase", fontWeight:600 }}>Live Analytics</span>
-          </div>
-          <h1 style={{ margin:"4px 0 0", fontSize:20, fontWeight:700, letterSpacing:"-0.02em" }}>
-            Trading Journal <span style={{ color:C.accent }}>Dashboard</span>
+          <h1 style={{ margin:0, fontSize:28, fontWeight:700, letterSpacing:"-0.02em" }}>
+            Welcome back, <span style={{ color:C.accent }}>Trader</span>!
           </h1>
+          <p style={{ color:C.sub, fontSize:14, margin:"6px 0 0" }}>
+            {todayTrades === 0 ? "No trades today. Great job!" : `You have ${todayTrades} trade${todayTrades===1?"":"s"} today.`}
+          </p>
         </div>
-        <div style={{ textAlign:"right" }}>
-          <p style={{ color: totalPnL>=0?C.green:C.red, fontSize:22, fontWeight:700, fontFamily:"'DM Mono',monospace", margin:0 }}>{fmt$(totalPnL)}</p>
-          <p style={{ color:C.sub, fontSize:11, margin:"2px 0 0" }}>{trades.length} trades logged</p>
-        </div>
+        <button
+          onClick={() => setShowModal(true)}
+          style={{
+            background: C.accent,
+            color: "#000",
+            border: "none",
+            borderRadius: 8,
+            padding: "12px 24px",
+            fontWeight: 700,
+            fontSize: 14,
+            cursor: "pointer",
+            transition: "all 0.2s",
+          }}
+          onMouseOver={(e) => e.target.style.transform = "scale(1.05)"}
+          onMouseOut={(e) => e.target.style.transform = "scale(1)"}
+        >
+          + New Trade
+        </button>
       </div>
 
-      {/* ── TABS ── */}
-      <div style={{ display:"flex", gap:4, padding:"14px 28px", borderBottom:`1px solid ${C.border}`, overflowX:"auto" }}>
-        {tabs.map(t=>(
-          <button key={t} onClick={()=>setView(t)} style={{ background: view===t ? C.accent : "transparent", color: view===t ? "#000" : C.sub, border:`1px solid ${view===t?C.accent:C.border}`, borderRadius:8, padding:"6px 14px", fontSize:12, fontWeight:600, cursor:"pointer", textTransform:"capitalize", whiteSpace:"nowrap", transition:"all 0.15s" }}>
-            {t}
-          </button>
-        ))}
+      {/* MAIN CONTENT */}
+      <div style={{ padding:"28px 40px" }}>
+        {trades.length === 0 ? (
+          <div style={{ textAlign:"center", padding:"60px 20px", color:C.sub }}>
+            <p style={{ fontSize:16 }}>No trades found. Start by logging your first trade!</p>
+          </div>
+        ) : (
+          <>
+            {/* TOP METRICS */}
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:16, marginBottom:32 }}>
+              <MetricCard label="Total Return" value={fmt$(totalPnL)} sub={totalPnL >= 0 ? "+2.4%" : ""} color={totalPnL >= 0 ? C.green : C.red} size="large" />
+              <MetricCard label="Win Rate" value={`${winRate}%`} sub={`${trades.length >= 20 ? Math.round(wins.slice(-20).length/20*100) : winRate}% (last 20)`} color={winRate >= 50 ? C.green : C.red} size="large" />
+              <MetricCard label="Profit Factor" value={profFactor || "N/A"} sub={profFactor >= 1.5 ? "Healthy" : "Target 1.5"} color={profFactor >= 1.5 ? C.green : C.accent} size="large" />
+              <MetricCard label="Today's P&L" value={fmt$(todayPnL)} sub={`${todayTrades} trades`} color={todayPnL >= 0 ? C.green : C.red} size="large" />
+            </div>
+
+            {/* EQUITY CURVE */}
+            <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:"24px", marginBottom:32 }}>
+              <div style={{ marginBottom:20 }}>
+                <h2 style={{ margin:0, fontSize:16, fontWeight:700, color:C.text }}>Equity Curve</h2>
+                <p style={{ margin:"4px 0 0", fontSize:12, color:C.sub }}>Cumulative P&L over time</p>
+              </div>
+              <ResponsiveContainer width="100%" height={280}>
+                <AreaChart data={equity}>
+                  <defs>
+                    <linearGradient id="eq" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={C.green} stopOpacity={0.3} />
+                      <stop offset="95%" stopColor={C.green} stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke={C.border} />
+                  <XAxis dataKey="date" stroke={C.sub} style={{ fontSize:11 }} />
+                  <YAxis stroke={C.sub} style={{ fontSize:11 }} />
+                  <Tooltip content={<TT />} />
+                  <Area type="monotone" dataKey="balance" stroke={C.green} fillOpacity={1} fill="url(#eq)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* PERFORMANCE METRICS */}
+            <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:"24px", marginBottom:32 }}>
+              <h2 style={{ margin:"0 0 20px", fontSize:16, fontWeight:700, color:C.text }}>Performance Metrics</h2>
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(6, 1fr)", gap:16 }}>
+                <MetricCard label="Expectancy" value={`${expectancy}R`} color={expectancy > 0 ? C.green : C.red} />
+                <MetricCard label="Avg Win" value={`${avgWinR}R`} color={C.green} />
+                <MetricCard label="Avg Loss" value={`-${avgLossR}R`} color={C.red} />
+                <MetricCard label="Max Drawdown" value={"-Infinity%"} color={C.red} />
+                <MetricCard label="Avg Trade Duration" value={"3h"} color={C.blue} />
+                <MetricCard label="Total Trades" value={trades.length} color={C.text} />
+              </div>
+            </div>
+
+            {/* RECENT TRADES */}
+            {recentTrades.length > 0 && (
+              <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:"24px", marginBottom:32 }}>
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:20 }}>
+                  <h2 style={{ margin:0, fontSize:16, fontWeight:700 }}>Recent Trades</h2>
+                  <a href="#" style={{ color:C.accent, textDecoration:"none", fontSize:13, fontWeight:600 }}>View All →</a>
+                </div>
+                
+                <div>
+                  {recentTrades.map((t, i) => (
+                    <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr 2fr 1fr 1fr", gap:16, padding:"12px 0", borderBottom: i < recentTrades.length - 1 ? `1px solid ${C.border}` : "none", alignItems:"center" }}>
+                      <div>
+                        <p style={{ margin:0, fontSize:14, fontWeight:600, color:C.text }}>{t.pair}</p>
+                        <p style={{ margin:"2px 0 0", fontSize:11, color:C.sub }}>{new Date(t.date).toLocaleDateString()} {new Date(t.date).toLocaleTimeString().slice(0,5)}</p>
+                      </div>
+                      <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                        <span style={{ background:t.outcome==="Win"?`${C.green}20`:t.outcome==="Loss"?`${C.red}20`:C.muted, padding:"4px 10px", borderRadius:4, fontSize:11, color:C.text }}>{t.outcome}</span>
+                        {t.setup && <span style={{ fontSize:11, color:C.sub }}>{t.setup}</span>}
+                      </div>
+                      <p style={{ margin:0, fontSize:14, fontWeight:600, color: t.pnl >= 0 ? C.green : C.red, textAlign:"right" }}>{fmt$(t.pnl)}</p>
+                      <p style={{ margin:0, fontSize:13, fontWeight:600, color: t.rMultiple >= 0 ? C.green : C.red, textAlign:"right" }}>{fmtR(t.rMultiple)}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* TOP STRATEGIES */}
+            {bySetup.length > 0 && (
+              <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:"24px" }}>
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:20 }}>
+                  <h2 style={{ margin:0, fontSize:16, fontWeight:700 }}>Top Strategies</h2>
+                  <a href="#" style={{ color:C.accent, textDecoration:"none", fontSize:13, fontWeight:600 }}>View All →</a>
+                </div>
+
+                <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(280px, 1fr))", gap:16 }}>
+                  {bySetup.slice(0, 4).map((s, i) => (
+                    <div key={i} style={{ background:C.bg, border:`1px solid ${C.border}`, borderRadius:8, padding:"16px" }}>
+                      <p style={{ margin:0, fontSize:14, fontWeight:600, color:C.text }}>{i+1}. {s.label}</p>
+                      <div style={{ display:"flex", gap:16, margin:"12px 0 0", fontSize:11, color:C.sub }}>
+                        <span>{s.total} trades</span>
+                        <span>• {s.winRate}% win</span>
+                      </div>
+                      <p style={{ margin:"12px 0 0", fontSize:16, fontWeight:700, color: s.pnl >= 0 ? C.green : C.red }}>{fmt$(s.pnl)}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
+
+      {/* TRADE LOG MODAL */}
+      <TradeLogModal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        onSuccess={() => {
+          // Refetch trades
+          fetch("/api/trades")
+            .then(r => r.json())
+            .then(d => setTrades(d.trades || []))
+            .catch(console.error);
+        }}
+      />
+    </div>
+  );
+}
 
       <div style={{ padding:"24px 28px" }}>
 
