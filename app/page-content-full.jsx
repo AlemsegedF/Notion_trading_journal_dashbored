@@ -84,6 +84,7 @@ const MetricCard = ({ label, value, sub, color, size = "normal" }) => {
 };
 
 export default function TradingDashboard() {
+  const [view, setView] = useState("overview");
   const [trades, setTrades] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -126,6 +127,53 @@ export default function TradingDashboard() {
 
   // Recent trades (last 5)
   const recentTrades = trades.slice(-5).reverse();
+
+  const monthlyData = useMemo(()=>{
+    try {
+      if (!trades || trades.length === 0) return [];
+      const m = {};
+      trades.filter(t=>t && t.date).forEach(t=>{ 
+        try {
+          const k=month(t.date); 
+          if(!m[k]) m[k]={month:k,pnl:0,trades:0,wins:0}; 
+          m[k].pnl += t.pnl || 0; 
+          m[k].trades++; 
+          if(t.outcome==="Win") m[k].wins++; 
+        } catch(err) { console.error("monthlyData trade error:", err); }
+      });
+      return Object.values(m).map(v=>({...v, winRate:v.trades>0?Math.round(v.wins/v.trades*100):0}));
+    } catch(e) { console.error("monthlyData:",e); return []; }
+  },[trades]);
+
+  const weeklyData = useMemo(()=>{
+    try {
+      if (!trades || trades.length === 0) return [];
+      const w = {};
+      trades.filter(t=>t && t.date).forEach(t=>{ 
+        try {
+          const k=week(t.date); 
+          if(!w[k]) w[k]={week:k,pnl:0,trades:0,wins:0}; 
+          w[k].pnl += t.pnl || 0; 
+          w[k].trades++; 
+          if(t.outcome==="Win") w[k].wins++; 
+        } catch(err) { console.error("weeklyData trade error:", err); }
+      });
+      return Object.values(w).map(v=>({...v,winRate:v.trades>0?Math.round(v.wins/v.trades*100):0}));
+    } catch(e) { console.error("weeklyData:",e); return []; }
+  },[trades]);
+
+  const byPair  = useMemo(()=>{ try { return groupBy(trades,t=>t.pair); } catch(e) { console.error("byPair:",e); return []; } },[trades]);
+  const bySess  = useMemo(()=>{ try { return groupBy(trades,t=>t.session); } catch(e) { console.error("bySess:",e); return []; } },[trades]);
+
+  const radarDat = bySetup.length>0 ? bySetup.map(s=>({ setup: (s.label||"N/A").replace(" Entry","").replace("Liquidity Sweep","Liq.Sweep"), winRate: s.winRate||0, avgR: (s.avgR||0)*25 })) : [];
+
+  const pieDat = [
+    { name:"Wins", value: wins.length, color: C.green },
+    { name:"Losses", value: losses.length, color: C.red },
+    { name:"Breakeven", value: trades.filter(t=>t.outcome==="Breakeven").length, color: C.muted },
+  ];
+
+  const tabs = ["overview","equity","pairs","setups","weekly","monthly"];
 
   if (loading) {
     return (
@@ -180,6 +228,15 @@ export default function TradingDashboard() {
         </button>
       </div>
 
+      {/* TABS */}
+      <div style={{ display:"flex", gap:4, padding:"14px 40px", borderBottom:`1px solid ${C.border}`, overflowX:"auto" }}>
+        {tabs.map(t=>(
+          <button key={t} onClick={()=>setView(t)} style={{ background: view===t ? C.accent : "transparent", color: view===t ? "#000" : C.sub, border:`1px solid ${view===t?C.accent:C.border}`, borderRadius:8, padding:"6px 14px", fontSize:12, fontWeight:600, cursor:"pointer", textTransform:"capitalize", whiteSpace:"nowrap", transition:"all 0.15s" }}>
+            {t}
+          </button>
+        ))}
+      </div>
+
       {/* MAIN CONTENT */}
       <div style={{ padding:"28px 40px" }}>
         {trades.length === 0 ? (
@@ -188,98 +245,202 @@ export default function TradingDashboard() {
           </div>
         ) : (
           <>
-            {/* TOP METRICS */}
-            <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:16, marginBottom:32 }}>
-              <MetricCard label="Total Return" value={fmt$(totalPnL)} sub={totalPnL >= 0 ? "+2.4%" : ""} color={totalPnL >= 0 ? C.green : C.red} size="large" />
-              <MetricCard label="Win Rate" value={`${winRate}%`} sub={`${trades.length >= 20 ? Math.round(wins.slice(-20).length/20*100) : winRate}% (last 20)`} color={winRate >= 50 ? C.green : C.red} size="large" />
-              <MetricCard label="Profit Factor" value={profFactor || "N/A"} sub={profFactor >= 1.5 ? "Healthy" : "Target 1.5"} color={profFactor >= 1.5 ? C.green : C.accent} size="large" />
-              <MetricCard label="Today's P&L" value={fmt$(todayPnL)} sub={`${todayTrades} trades`} color={todayPnL >= 0 ? C.green : C.red} size="large" />
-            </div>
-
-            {/* EQUITY CURVE */}
-            <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:"24px", marginBottom:32 }}>
-              <div style={{ marginBottom:20 }}>
-                <h2 style={{ margin:0, fontSize:16, fontWeight:700, color:C.text }}>Equity Curve</h2>
-                <p style={{ margin:"4px 0 0", fontSize:12, color:C.sub }}>Cumulative P&L over time</p>
-              </div>
-              <ResponsiveContainer width="100%" height={280}>
-                <AreaChart data={equity}>
-                  <defs>
-                    <linearGradient id="eq" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={C.green} stopOpacity={0.3} />
-                      <stop offset="95%" stopColor={C.green} stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke={C.border} />
-                  <XAxis dataKey="date" stroke={C.sub} style={{ fontSize:11 }} />
-                  <YAxis stroke={C.sub} style={{ fontSize:11 }} />
-                  <Tooltip content={<TT />} />
-                  <Area type="monotone" dataKey="balance" stroke={C.green} fillOpacity={1} fill="url(#eq)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-
-            {/* PERFORMANCE METRICS */}
-            <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:"24px", marginBottom:32 }}>
-              <h2 style={{ margin:"0 0 20px", fontSize:16, fontWeight:700, color:C.text }}>Performance Metrics</h2>
-              <div style={{ display:"grid", gridTemplateColumns:"repeat(6, 1fr)", gap:16 }}>
-                <MetricCard label="Expectancy" value={`${expectancy}R`} color={expectancy > 0 ? C.green : C.red} />
-                <MetricCard label="Avg Win" value={`${avgWinR}R`} color={C.green} />
-                <MetricCard label="Avg Loss" value={`-${avgLossR}R`} color={C.red} />
-                <MetricCard label="Max Drawdown" value={"-Infinity%"} color={C.red} />
-                <MetricCard label="Avg Trade Duration" value={"3h"} color={C.blue} />
-                <MetricCard label="Total Trades" value={trades.length} color={C.text} />
-              </div>
-            </div>
-
-            {/* RECENT TRADES */}
-            {recentTrades.length > 0 && (
-              <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:"24px", marginBottom:32 }}>
-                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:20 }}>
-                  <h2 style={{ margin:0, fontSize:16, fontWeight:700 }}>Recent Trades</h2>
-                  <a href="#" style={{ color:C.accent, textDecoration:"none", fontSize:13, fontWeight:600 }}>View All →</a>
+            {view === "overview" && (
+              <>
+                {/* TOP METRICS */}
+                <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:16, marginBottom:32 }}>
+                  <MetricCard label="Total Return" value={fmt$(totalPnL)} sub={totalPnL >= 0 ? "+2.4%" : ""} color={totalPnL >= 0 ? C.green : C.red} size="large" />
+                  <MetricCard label="Win Rate" value={`${winRate}%`} sub={`${trades.length >= 20 ? Math.round(wins.slice(-20).length/20*100) : winRate}% (last 20)`} color={winRate >= 50 ? C.green : C.red} size="large" />
+                  <MetricCard label="Profit Factor" value={profFactor || "N/A"} sub={profFactor >= 1.5 ? "Healthy" : "Target 1.5"} color={profFactor >= 1.5 ? C.green : C.accent} size="large" />
+                  <MetricCard label="Today's P&L" value={fmt$(todayPnL)} sub={`${todayTrades} trades`} color={todayPnL >= 0 ? C.green : C.red} size="large" />
                 </div>
-                
-                <div>
-                  {recentTrades.map((t, i) => (
-                    <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr 2fr 1fr 1fr", gap:16, padding:"12px 0", borderBottom: i < recentTrades.length - 1 ? `1px solid ${C.border}` : "none", alignItems:"center" }}>
-                      <div>
-                        <p style={{ margin:0, fontSize:14, fontWeight:600, color:C.text }}>{t.pair}</p>
-                        <p style={{ margin:"2px 0 0", fontSize:11, color:C.sub }}>{new Date(t.date).toLocaleDateString()} {new Date(t.date).toLocaleTimeString().slice(0,5)}</p>
-                      </div>
-                      <div style={{ display:"flex", gap:8, alignItems:"center" }}>
-                        <span style={{ background:t.outcome==="Win"?`${C.green}20`:t.outcome==="Loss"?`${C.red}20`:C.muted, padding:"4px 10px", borderRadius:4, fontSize:11, color:C.text }}>{t.outcome}</span>
-                        {t.setup && <span style={{ fontSize:11, color:C.sub }}>{t.setup}</span>}
-                      </div>
-                      <p style={{ margin:0, fontSize:14, fontWeight:600, color: t.pnl >= 0 ? C.green : C.red, textAlign:"right" }}>{fmt$(t.pnl)}</p>
-                      <p style={{ margin:0, fontSize:13, fontWeight:600, color: t.rMultiple >= 0 ? C.green : C.red, textAlign:"right" }}>{fmtR(t.rMultiple)}</p>
+
+                {/* EQUITY CURVE */}
+                <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:"24px", marginBottom:32 }}>
+                  <div style={{ marginBottom:20 }}>
+                    <h2 style={{ margin:0, fontSize:16, fontWeight:700, color:C.text }}>Equity Curve</h2>
+                    <p style={{ margin:"4px 0 0", fontSize:12, color:C.sub }}>Cumulative P&L over time</p>
+                  </div>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <AreaChart data={equity}>
+                      <defs>
+                        <linearGradient id="eq" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor={C.green} stopOpacity={0.3} />
+                          <stop offset="95%" stopColor={C.green} stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke={C.border} />
+                      <XAxis dataKey="date" stroke={C.sub} style={{ fontSize:11 }} />
+                      <YAxis stroke={C.sub} style={{ fontSize:11 }} />
+                      <Tooltip content={<TT />} />
+                      <Area type="monotone" dataKey="balance" stroke={C.green} fillOpacity={1} fill="url(#eq)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* PERFORMANCE METRICS */}
+                <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:"24px", marginBottom:32 }}>
+                  <h2 style={{ margin:"0 0 20px", fontSize:16, fontWeight:700, color:C.text }}>Performance Metrics</h2>
+                  <div style={{ display:"grid", gridTemplateColumns:"repeat(6, 1fr)", gap:16 }}>
+                    <MetricCard label="Expectancy" value={`${expectancy}R`} color={expectancy > 0 ? C.green : C.red} />
+                    <MetricCard label="Avg Win" value={`${avgWinR}R`} color={C.green} />
+                    <MetricCard label="Avg Loss" value={`-${avgLossR}R`} color={C.red} />
+                    <MetricCard label="Max Drawdown" value={"-Infinity%"} color={C.red} />
+                    <MetricCard label="Avg Trade Duration" value={"3h"} color={C.blue} />
+                    <MetricCard label="Total Trades" value={trades.length} color={C.text} />
+                  </div>
+                </div>
+
+                {/* RECENT TRADES */}
+                {recentTrades.length > 0 && (
+                  <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:"24px", marginBottom:32 }}>
+                    <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:20 }}>
+                      <h2 style={{ margin:0, fontSize:16, fontWeight:700 }}>Recent Trades</h2>
+                      <a href="#" style={{ color:C.accent, textDecoration:"none", fontSize:13, fontWeight:600 }}>View All →</a>
                     </div>
-                  ))}
-                </div>
-              </div>
+                    
+                    <div>
+                      {recentTrades.map((t, i) => (
+                        <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr 2fr 1fr 1fr", gap:16, padding:"12px 0", borderBottom: i < recentTrades.length - 1 ? `1px solid ${C.border}` : "none", alignItems:"center" }}>
+                          <div>
+                            <p style={{ margin:0, fontSize:14, fontWeight:600, color:C.text }}>{t.pair}</p>
+                            <p style={{ margin:"2px 0 0", fontSize:11, color:C.sub }}>{new Date(t.date).toLocaleDateString()} {new Date(t.date).toLocaleTimeString().slice(0,5)}</p>
+                          </div>
+                          <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                            <span style={{ background:t.outcome==="Win"?`${C.green}20`:t.outcome==="Loss"?`${C.red}20`:C.muted, padding:"4px 10px", borderRadius:4, fontSize:11, color:C.text }}>{t.outcome}</span>
+                            {t.setup && <span style={{ fontSize:11, color:C.sub }}>{t.setup}</span>}
+                          </div>
+                          <p style={{ margin:0, fontSize:14, fontWeight:600, color: t.pnl >= 0 ? C.green : C.red, textAlign:"right" }}>{fmt$(t.pnl)}</p>
+                          <p style={{ margin:0, fontSize:13, fontWeight:600, color: t.rMultiple >= 0 ? C.green : C.red, textAlign:"right" }}>{fmtR(t.rMultiple)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* TOP STRATEGIES */}
+                {bySetup.length > 0 && (
+                  <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:"24px" }}>
+                    <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:20 }}>
+                      <h2 style={{ margin:0, fontSize:16, fontWeight:700 }}>Top Strategies</h2>
+                      <a href="#" style={{ color:C.accent, textDecoration:"none", fontSize:13, fontWeight:600 }}>View All →</a>
+                    </div>
+
+                    <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(280px, 1fr))", gap:16 }}>
+                      {bySetup.slice(0, 4).map((s, i) => (
+                        <div key={i} style={{ background:C.bg, border:`1px solid ${C.border}`, borderRadius:8, padding:"16px" }}>
+                          <p style={{ margin:0, fontSize:14, fontWeight:600, color:C.text }}>{i+1}. {s.label}</p>
+                          <div style={{ display:"flex", gap:16, margin:"12px 0 0", fontSize:11, color:C.sub }}>
+                            <span>{s.total} trades</span>
+                            <span>• {s.winRate}% win</span>
+                          </div>
+                          <p style={{ margin:"12px 0 0", fontSize:16, fontWeight:700, color: s.pnl >= 0 ? C.green : C.red }}>{fmt$(s.pnl)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
-            {/* TOP STRATEGIES */}
-            {bySetup.length > 0 && (
-              <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:"24px" }}>
-                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:20 }}>
-                  <h2 style={{ margin:0, fontSize:16, fontWeight:700 }}>Top Strategies</h2>
-                  <a href="#" style={{ color:C.accent, textDecoration:"none", fontSize:13, fontWeight:600 }}>View All →</a>
+            {view === "equity" && (
+              <>
+                <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:"20px 16px", marginBottom:20 }}>
+                  <h2 style={{ margin:0, fontSize:16, fontWeight:700, color:C.text }}>Full Equity Curve</h2>
+                  <p style={{ margin:"4px 0 0", fontSize:12, color:C.sub }}>Cumulative balance growth</p>
+                  <ResponsiveContainer width="100%" height={300} style={{marginTop: 20}}>
+                    <AreaChart data={equity}>
+                      <defs>
+                        <linearGradient id="eq2" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor={C.green} stopOpacity={0.35}/>
+                          <stop offset="95%" stopColor={C.green} stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid stroke={C.border} strokeDasharray="3 3" />
+                      <XAxis dataKey="n" stroke={C.muted} tick={{fontSize:11}} />
+                      <YAxis stroke={C.muted} tick={{fontSize:11}} tickFormatter={v=>`$${v}`} />
+                      <Tooltip formatter={(v)=>[fmt$(v),"Balance"]} />
+                      <Area type="monotone" dataKey="balance" stroke={C.green} fill="url(#eq2)" strokeWidth={2.5} />
+                    </AreaChart>
+                  </ResponsiveContainer>
                 </div>
+              </>
+            )}
 
-                <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(280px, 1fr))", gap:16 }}>
-                  {bySetup.slice(0, 4).map((s, i) => (
-                    <div key={i} style={{ background:C.bg, border:`1px solid ${C.border}`, borderRadius:8, padding:"16px" }}>
-                      <p style={{ margin:0, fontSize:14, fontWeight:600, color:C.text }}>{i+1}. {s.label}</p>
-                      <div style={{ display:"flex", gap:16, margin:"12px 0 0", fontSize:11, color:C.sub }}>
-                        <span>{s.total} trades</span>
-                        <span>• {s.winRate}% win</span>
-                      </div>
-                      <p style={{ margin:"12px 0 0", fontSize:16, fontWeight:700, color: s.pnl >= 0 ? C.green : C.red }}>{fmt$(s.pnl)}</p>
-                    </div>
-                  ))}
+            {view === "pairs" && (
+              <>
+                <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:"20px 16px", marginBottom:20 }}>
+                  <h2 style={{ margin:0, fontSize:16, fontWeight:700, color:C.text }}>P&L by Pair</h2>
+                  <ResponsiveContainer width="100%" height={250} style={{marginTop: 20}}>
+                    <BarChart data={byPair}>
+                      <CartesianGrid stroke={C.border} strokeDasharray="3 3" />
+                      <XAxis dataKey="label" stroke={C.muted} />
+                      <YAxis stroke={C.muted} tickFormatter={v=>`$${v}`} />
+                      <Tooltip />
+                      <Bar dataKey="pnl" name="P&L" radius={[4,4,0,0]}>
+                        {byPair.map((d,i)=><Cell key={i} fill={d.pnl>=0?C.green:C.red}/>)}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
-              </div>
+              </>
+            )}
+
+            {view === "setups" && (
+              <>
+                <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:"20px 16px" }}>
+                  <h2 style={{ margin:0, fontSize:16, fontWeight:700, color:C.text }}>P&L by Setup</h2>
+                  <ResponsiveContainer width="100%" height={250} style={{marginTop: 20}}>
+                    <BarChart data={bySetup}>
+                      <CartesianGrid stroke={C.border} strokeDasharray="3 3" />
+                      <XAxis dataKey="label" stroke={C.muted} />
+                      <YAxis stroke={C.muted} tickFormatter={v=>`$${v}`} />
+                      <Tooltip />
+                      <Bar dataKey="pnl" name="P&L" radius={[4,4,0,0]}>
+                        {bySetup.map((d,i)=><Cell key={i} fill={d.pnl>=0?C.green:C.red}/>)}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </>
+            )}
+
+            {view === "weekly" && (
+              <>
+                <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:"20px 16px" }}>
+                  <h2 style={{ margin:0, fontSize:16, fontWeight:700, color:C.text }}>Weekly P&L</h2>
+                  <ResponsiveContainer width="100%" height={250} style={{marginTop: 20}}>
+                    <BarChart data={weeklyData}>
+                      <CartesianGrid stroke={C.border} strokeDasharray="3 3" />
+                      <XAxis dataKey="week" stroke={C.muted} />
+                      <YAxis stroke={C.muted} tickFormatter={v=>`$${v}`} />
+                      <Tooltip />
+                      <Bar dataKey="pnl" name="P&L" radius={[4,4,0,0]}>
+                        {weeklyData.map((d,i)=><Cell key={i} fill={d.pnl>=0?C.green:C.red}/>)}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </>
+            )}
+
+            {view === "monthly" && (
+              <>
+                <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:"20px 16px" }}>
+                  <h2 style={{ margin:0, fontSize:16, fontWeight:700, color:C.text }}>Monthly P&L</h2>
+                  <ResponsiveContainer width="100%" height={250} style={{marginTop: 20}}>
+                    <BarChart data={monthlyData}>
+                      <CartesianGrid stroke={C.border} strokeDasharray="3 3" />
+                      <XAxis dataKey="month" stroke={C.muted} />
+                      <YAxis stroke={C.muted} tickFormatter={v=>`$${v}`} />
+                      <Tooltip />
+                      <Bar dataKey="pnl" name="P&L" radius={[4,4,0,0]}>
+                        {monthlyData.map((d,i)=><Cell key={i} fill={d.pnl>=0?C.green:C.red}/>)}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </>
             )}
           </>
         )}
