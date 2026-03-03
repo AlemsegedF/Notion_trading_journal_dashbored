@@ -1,9 +1,6 @@
 import { Client } from "@notionhq/client";
 
-const notion = new Client({
-  auth: process.env.NOTION_TOKEN,
-});
-
+const notion = new Client({ auth: process.env.NOTION_TOKEN });
 const DATABASE_ID = process.env.NOTION_DATABASE_ID;
 
 export async function GET(request) {
@@ -15,65 +12,59 @@ export async function GET(request) {
       );
     }
 
-    const response = await notion.databases.query({
-      database_id: DATABASE_ID,
-      sorts: [
-        {
-          property: "Date",
-          direction: "descending",
-        },
-      ],
-    });
+    let allResults = [];
+    let cursor = undefined;
 
-    const trades = response.results.map((page) => {
-      const props = page.properties;
+    do {
+      const response = await notion.databases.query({
+        database_id: DATABASE_ID,
+        sorts: [{ property: "Date", direction: "ascending" }],
+        ...(cursor ? { start_cursor: cursor } : {}),
+      });
+      allResults = [...allResults, ...response.results];
+      cursor = response.has_more ? response.next_cursor : undefined;
+    } while (cursor);
 
-      // Extract values from Notion properties
-      const getTextValue = (prop) => {
-        if (!prop) return "";
-        if (prop.type === "title" && prop.title?.length > 0)
-          return prop.title[0].plain_text;
-        if (prop.type === "rich_text" && prop.rich_text?.length > 0)
-          return prop.rich_text[0].plain_text;
-        return "";
-      };
+    const trades = allResults.map((page) => {
+      const p = page.properties;
 
-      const getNumberValue = (prop) => {
-        return prop?.number || 0;
-      };
-
-      const getSelectValue = (prop) => {
-        return prop?.select?.name || "";
-      };
-
-      const getCheckboxValue = (prop) => {
-        return prop?.checkbox || false;
-      };
-
-      const getDateValue = (prop) => {
-        return prop?.date?.start || new Date().toISOString().split("T")[0];
-      };
+      const title  = (k) => p[k]?.title?.[0]?.plain_text || "";
+      const text   = (k) => p[k]?.rich_text?.[0]?.plain_text || "";
+      const num    = (k) => p[k]?.number ?? 0;
+      const sel    = (k) => p[k]?.select?.name || "";
+      const date   = (k) => p[k]?.date?.start || "";
+      const msel   = (k) => p[k]?.multi_select?.map(s => s.name) || [];
+      const url    = (k) => p[k]?.url || "";
 
       return {
-        id: page.id,
-        date: getDateValue(props.Date),
-        pair: getTextValue(props.Pair),
-        session: getSelectValue(props.Session),
-        setup: getSelectValue(props.Setup),
-        outcome: getSelectValue(props.Outcome),
-        pnl: getNumberValue(props["P&L"]),
-        r: getNumberValue(props.R),
-        risk: getNumberValue(props.Risk),
-        sopOk: getCheckboxValue(props["SOP OK"]),
-        exec: getNumberValue(props.Execution),
+        id:           page.id,
+        name:         title("Trade #"),
+        date:         date("Date"),
+        pair:         sel("Pair"),
+        session:      sel("Session"),
+        direction:    sel("Direction"),
+        setup:        sel("Setup Type"),
+        htfBias:      sel("HTF Bias"),
+        phase:        sel("Phase"),
+        rrPlanned:    num("RR Planned"),
+        outcome:      sel("Outcome"),
+        pnl:          num("PnL USD"),
+        rMultiple:    num("R Multiple"),
+        execGrade:    sel("Execution Grade"),
+        sopOk:        sel("SOP Followed?") === "Yes ✅",
+        sopViolation: sel("SOP Violation"),
+        whatWorked:   text("What Worked"),
+        whatToImprove:text("What To Improve"),
+        tags:         msel("Tags"),
       };
-    });
+    }).filter(t => t.date && t.outcome && !t.outcome.includes("Running"));
 
-    return Response.json({ trades });
+    return Response.json({ trades, count: allResults.length });
+
   } catch (error) {
     console.error("Notion API error:", error);
     return Response.json(
-      { error: "Failed to fetch trades from Notion" },
+      { error: error.message || "Failed to fetch trades" },
       { status: 500 }
     );
   }

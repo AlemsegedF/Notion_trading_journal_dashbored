@@ -44,7 +44,7 @@ function groupBy(trades, keyFn) {
     map[k].trades.push(t);
     map[k].total++;
     map[k].pnl += t.pnl;
-    map[k].r   += t.r;
+    map[k].r   += t.rMultiple;
     if (t.outcome === "Win") map[k].wins++;
   });
   return Object.values(map).map(g => ({ ...g, winRate: Math.round(g.wins/g.total*100), avgR: +(g.r/g.total).toFixed(2) }));
@@ -133,9 +133,9 @@ export default function TradingDashboard() {
   const losses    = trades.filter(t=>t.outcome==="Loss");
   const winRate   = trades.length > 0 ? Math.round(wins.length/trades.length*100) : 0;
   const totalPnL  = trades.reduce((s,t)=>s+t.pnl,0);
-  const avgR      = trades.length > 0 ? +(trades.reduce((s,t)=>s+t.r,0)/trades.length).toFixed(2) : 0;
-  const avgWinR   = wins.length > 0 ? +(wins.reduce((s,t)=>s+t.r,0)/wins.length).toFixed(2) : 0;
-  const avgLossR  = losses.length > 0 ? +(Math.abs(losses.reduce((s,t)=>s+t.r,0)/losses.length)).toFixed(2) : 0;
+  const avgR      = trades.length > 0 ? +(trades.reduce((s,t)=>s+t.rMultiple,0)/trades.length).toFixed(2) : 0;
+  const avgWinR   = wins.length > 0 ? +(wins.reduce((s,t)=>s+t.rMultiple,0)/wins.length).toFixed(2) : 0;
+  const avgLossR  = losses.length > 0 ? +(Math.abs(losses.reduce((s,t)=>s+t.rMultiple,0)/losses.length)).toFixed(2) : 0;
   const expectancy= +((winRate/100*avgWinR)-((100-winRate)/100*avgLossR)).toFixed(3);
   const profFactor= wins.length > 0 && losses.length > 0 ? +(wins.reduce((s,t)=>s+t.pnl,0)/Math.abs(losses.reduce((s,t)=>s+t.pnl,0))).toFixed(2) : 0;
   const violations= trades.filter(t=>!t.sopOk).length;
@@ -212,7 +212,7 @@ export default function TradingDashboard() {
             <StatCard label="Avg R:R" value={`${avgR}R`} color={C.blue} />
             <StatCard label="Trades" value={trades.length} sub="Total" />
             <StatCard label="SOP Violations" value={violations} sub={`${trades.length-violations} clean`} color={violations===0?C.green:C.red} />
-            <StatCard label="Best Trade" value={`+${Math.max(...trades.map(t=>t.r))}R`} color={C.accent} glow />
+            <StatCard label="Best Trade" value={`+${Math.max(...trades.map(t=>t.rMultiple))}R`} color={C.accent} glow />
           </div>
 
           {/* Equity + Pie */}
@@ -319,7 +319,7 @@ export default function TradingDashboard() {
           <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:"20px 16px", marginBottom:20 }}>
             <SectionHeader title="📊 R-Multiple Per Trade" sub="How many R you gained or lost on each trade" />
             <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={trades.map((t,i)=>({n:i+1,r:t.r,pair:t.pair}))}>
+              <BarChart data={trades.map((t,i)=>({n:i+1,r:t.rMultiple,pair:t.pair}))}>
                 <CartesianGrid stroke={C.border} strokeDasharray="3 3" />
                 <XAxis dataKey="n" stroke={C.muted} tick={{fontSize:10}} />
                 <YAxis stroke={C.muted} tick={{fontSize:11}} tickFormatter={v=>`${v}R`} />
@@ -333,7 +333,7 @@ export default function TradingDashboard() {
           </div>
 
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
-            <StatCard label="Total R Earned" value={fmtR(trades.reduce((s,t)=>s+t.r,0))} color={C.green} glow />
+            <StatCard label="Total R Earned" value={fmtR(trades.reduce((s,t)=>s+t.rMultiple,0))} color={C.green} glow />
             <StatCard label="Max Drawdown" value={`$${Math.abs(Math.min(...equity.map(e=>e.balance))).toFixed(0)}`} color={C.red} />
             <StatCard label="Avg Win (R)" value={`+${avgWinR}R`} color={C.green} />
             <StatCard label="Avg Loss (R)" value={`-${avgLossR}R`} color={C.red} />
