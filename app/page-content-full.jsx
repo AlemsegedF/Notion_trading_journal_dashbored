@@ -265,7 +265,7 @@ export default function TradingDashboard() {
           <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:"20px 16px", marginBottom:28 }}>
             <SectionHeader title="💹 P&L Per Trade" sub="Green = win, Red = loss" />
             <ResponsiveContainer width="100%" height={160}>
-              <BarChart data={trades.map((t,i)=>({n:i+1,pnl:t.pnl,r:t.r}))}>
+              <BarChart data={trades.map((t,i)=>({n:i+1,pnl:t.pnl,r:t.rMultiple}))}>
                 <CartesianGrid stroke={C.border} strokeDasharray="3 3" />
                 <XAxis dataKey="n" stroke={C.muted} tick={{fontSize:9}} />
                 <YAxis stroke={C.muted} tick={{fontSize:10}} tickFormatter={v=>`$${v}`} />
@@ -326,7 +326,7 @@ export default function TradingDashboard() {
                 <Tooltip formatter={v=>[fmtR(v),"R-Multiple"]} labelFormatter={l=>`Trade #${l}`} />
                 <ReferenceLine y={0} stroke={C.muted} />
                 <Bar dataKey="r" name="R Multiple" radius={[3,3,0,0]}>
-                  {trades.map((t,i)=><Cell key={i} fill={t.r>=0?C.green:C.red}/>)}
+                  {trades.map((t,i)=><Cell key={i} fill={t.rMultiple>=0?C.green:C.red}/>)}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
