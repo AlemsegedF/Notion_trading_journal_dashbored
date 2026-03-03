@@ -9,13 +9,15 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@notionhq/client": "^2.2.13",
+    "next": "^14.0.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "next": "^14.0.0",
-    "recharts": "^2.12.0",
-    "@notionhq/client": "^2.2.13"
+    "recharts": "^2.12.0"
   },
   "devDependencies": {
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
     "eslint": "^8.0.0",
     "eslint-config-next": "^14.0.0"
   }
