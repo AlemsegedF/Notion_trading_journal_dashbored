@@ -141,58 +141,58 @@ export default function DashboardPage() {
   const [usingMockData, setUsingMockData] = useState(false);
 
   // Fetch data from Notion
-  useEffect(() => {
-    const loadData = async () => {
-      setIsLoading(true);
-      setError(null);
+  const loadData = async () => {
+    setIsLoading(true);
+    setError(null);
 
-      try {
-        // Check if Notion is configured
-        const notionReady = await isNotionConfigured();
+    try {
+      // Check if Notion is configured
+      const notionReady = await isNotionConfigured();
 
-        if (!notionReady) {
-          console.warn('Notion not configured - falling back to mock data');
-          setUsingMockData(true);
-          setTrades(mockTrades);
-          setStrategies(mockStrategies);
-          
-          // Get today's trades from mock
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          const todays = mockTrades.filter(trade => {
-            const tradeDate = new Date(trade.exitTime);
-            tradeDate.setHours(0, 0, 0, 0);
-            return tradeDate.getTime() === today.getTime();
-          });
-          setTodayTrades(todays);
-          setIsLoading(false);
-          return;
-        }
-
-        // Fetch real data from Notion in parallel
-        const [allTrades, todaysTrades, allStrategies] = await Promise.all([
-          fetchTradesFromNotion(),
-          fetchTodaysTradesFromNotion(),
-          fetchStrategiesFromNotion(),
-        ]);
-
-        setTrades(allTrades);
-        setTodayTrades(todaysTrades);
-        setStrategies(allStrategies);
-        setUsingMockData(false);
-      } catch (err) {
-        console.error('Error loading data:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load data');
-        
-        // Fallback to mock data on error
+      if (!notionReady) {
+        console.warn('Notion not configured - falling back to mock data');
         setUsingMockData(true);
         setTrades(mockTrades);
         setStrategies(mockStrategies);
-      } finally {
+        
+        // Get today's trades from mock
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const todays = mockTrades.filter(trade => {
+          const tradeDate = new Date(trade.exitTime);
+          tradeDate.setHours(0, 0, 0, 0);
+          return tradeDate.getTime() === today.getTime();
+        });
+        setTodayTrades(todays);
         setIsLoading(false);
+        return;
       }
-    };
 
+      // Fetch real data from Notion in parallel
+      const [allTrades, todaysTrades, allStrategies] = await Promise.all([
+        fetchTradesFromNotion(),
+        fetchTodaysTradesFromNotion(),
+        fetchStrategiesFromNotion(),
+      ]);
+
+      setTrades(allTrades);
+      setTodayTrades(todaysTrades);
+      setStrategies(allStrategies);
+      setUsingMockData(false);
+    } catch (err) {
+      console.error('Error loading data:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load data');
+      
+      // Fallback to mock data on error
+      setUsingMockData(true);
+      setTrades(mockTrades);
+      setStrategies(mockStrategies);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
     loadData();
   }, []);
 
@@ -250,14 +250,14 @@ export default function DashboardPage() {
     return generateEquityCurve(trades, 50000);
   }, [trades]);
 
-  // Handle new trade button click
-  const handleNewTrade = () => {
-    alert('New Trade functionality coming soon! This will open a trade entry form.');
+  // Handle trade created - refresh data
+  const handleTradeCreated = () => {
+    loadData();
   };
 
   // Handle retry on error
   const handleRetry = () => {
-    window.location.reload();
+    loadData();
   };
 
   if (isLoading) {
@@ -281,7 +281,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <AppShell user={user} onNewTrade={handleNewTrade}>
+    <AppShell user={user} onTradeCreated={handleTradeCreated}>
       {usingMockData && (
         <div style={styles.banner}>
           <span style={styles.bannerIcon}>⚠️</span>

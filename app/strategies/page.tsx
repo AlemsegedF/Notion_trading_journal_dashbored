@@ -110,42 +110,38 @@ export default function StrategiesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [usingMockData, setUsingMockData] = useState(false);
 
-  useEffect(() => {
-    const loadData = async () => {
-      setIsLoading(true);
+  const loadData = async () => {
+    setIsLoading(true);
 
-      try {
-        const notionReady = await isNotionConfigured();
+    try {
+      const notionReady = await isNotionConfigured();
 
-        if (!notionReady) {
-          setUsingMockData(true);
-          const { mockStrategies } = await import('../lib/mockData');
-          setStrategies(mockStrategies);
-        } else {
-          const realStrategies = await fetchStrategiesFromNotion();
-          setStrategies(realStrategies);
-          setUsingMockData(false);
-        }
-      } catch (error) {
-        console.error('Error loading strategies:', error);
+      if (!notionReady) {
+        setUsingMockData(true);
         const { mockStrategies } = await import('../lib/mockData');
         setStrategies(mockStrategies);
-        setUsingMockData(true);
-      } finally {
-        setIsLoading(false);
+      } else {
+        const realStrategies = await fetchStrategiesFromNotion();
+        setStrategies(realStrategies);
+        setUsingMockData(false);
       }
-    };
+    } catch (error) {
+      console.error('Error loading strategies:', error);
+      const { mockStrategies } = await import('../lib/mockData');
+      setStrategies(mockStrategies);
+      setUsingMockData(true);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
+  useEffect(() => {
     loadData();
   }, []);
 
-  const handleNewTrade = () => {
-    alert('New Trade functionality coming soon!');
-  };
-
   if (isLoading) {
     return (
-      <AppShell user={user} onNewTrade={handleNewTrade}>
+      <AppShell user={user} onTradeCreated={loadData}>
         <div style={styles.header}>
           <h1 style={styles.title}>Strategies</h1>
           <p style={styles.subtitle}>Manage and analyze your trading strategies</p>
@@ -156,7 +152,7 @@ export default function StrategiesPage() {
   }
 
   return (
-    <AppShell user={user} onNewTrade={handleNewTrade}>
+    <AppShell user={user} onTradeCreated={loadData}>
       <div style={styles.header}>
         <h1 style={styles.title}>Strategies</h1>
         <p style={styles.subtitle}>Manage and analyze your trading strategies</p>

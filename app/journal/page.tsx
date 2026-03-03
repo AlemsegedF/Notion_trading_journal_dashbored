@@ -114,39 +114,39 @@ export default function JournalPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [usingMockData, setUsingMockData] = useState(false);
 
-  useEffect(() => {
-    const loadData = async () => {
-      setIsLoading(true);
+  const loadData = async () => {
+    setIsLoading(true);
 
-      try {
-        const notionReady = await isNotionConfigured();
+    try {
+      const notionReady = await isNotionConfigured();
 
-        if (!notionReady) {
-          setUsingMockData(true);
-          // Import mock data dynamically
-          const { mockTrades } = await import('../lib/mockData');
-          setTrades(mockTrades);
-        } else {
-          const realTrades = await fetchTradesFromNotion();
-          setTrades(realTrades);
-          setUsingMockData(false);
-        }
-      } catch (error) {
-        console.error('Error loading trades:', error);
-        // Fallback to mock data
+      if (!notionReady) {
+        setUsingMockData(true);
+        // Import mock data dynamically
         const { mockTrades } = await import('../lib/mockData');
         setTrades(mockTrades);
-        setUsingMockData(true);
-      } finally {
-        setIsLoading(false);
+      } else {
+        const realTrades = await fetchTradesFromNotion();
+        setTrades(realTrades);
+        setUsingMockData(false);
       }
-    };
+    } catch (error) {
+      console.error('Error loading trades:', error);
+      // Fallback to mock data
+      const { mockTrades } = await import('../lib/mockData');
+      setTrades(mockTrades);
+      setUsingMockData(true);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
+  useEffect(() => {
     loadData();
   }, []);
 
-  const handleNewTrade = () => {
-    alert('New Trade functionality coming soon!');
+  const handleTradeCreated = () => {
+    loadData();
   };
 
   // Sort trades by exit time descending
@@ -164,7 +164,7 @@ export default function JournalPage() {
   };
 
   return (
-    <AppShell user={user} onNewTrade={handleNewTrade}>
+    <AppShell user={user} onTradeCreated={handleTradeCreated}>
       <div style={styles.header}>
         <h1 style={styles.title}>Trade Journal</h1>
         <p style={styles.subtitle}>View and manage all your trades</p>

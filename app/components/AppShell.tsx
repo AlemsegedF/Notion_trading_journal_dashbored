@@ -6,11 +6,12 @@
  * Responsive design - desktop first
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { User, NavItem } from '../types';
 import { getInitials } from '../lib/utils';
+import NewTradeModal from './NewTradeModal';
 
 // ─── NAVIGATION CONFIG ───────────────────────────────────────────────────────
 
@@ -247,11 +248,12 @@ const styles = {
 interface AppShellProps {
   children: React.ReactNode;
   user: User;
-  onNewTrade?: () => void;
+  onTradeCreated?: () => void;
 }
 
-export default function AppShell({ children, user, onNewTrade }: AppShellProps) {
+export default function AppShell({ children, user, onTradeCreated }: AppShellProps) {
   const pathname = usePathname();
+  const [isNewTradeModalOpen, setIsNewTradeModalOpen] = useState(false);
 
   const getNavLinkStyle = (href: string) => {
     const isActive = pathname === href || (href !== '/' && pathname?.startsWith(href));
@@ -321,7 +323,7 @@ export default function AppShell({ children, user, onNewTrade }: AppShellProps) 
           <div style={styles.topBarRight}>
             <button
               style={styles.newTradeBtn}
-              onClick={onNewTrade}
+              onClick={() => setIsNewTradeModalOpen(true)}
               onMouseEnter={(e) => {
                 e.currentTarget.style.backgroundColor = '#f5c446';
               }}
@@ -340,6 +342,13 @@ export default function AppShell({ children, user, onNewTrade }: AppShellProps) 
           {children}
         </div>
       </main>
+
+      {/* New Trade Modal */}
+      <NewTradeModal
+        isOpen={isNewTradeModalOpen}
+        onClose={() => setIsNewTradeModalOpen(false)}
+        onTradeCreated={onTradeCreated}
+      />
     </div>
   );
 }
