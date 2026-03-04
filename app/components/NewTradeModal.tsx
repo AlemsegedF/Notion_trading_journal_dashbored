@@ -23,6 +23,7 @@ const HTF_BIASES = ['Bullish', 'Bearish', 'Neutral'];
 const DXY_DIRECTIONS = ['Up', 'Down', 'Neutral'];
 const PHASES = ['Demo', 'Evaluation', 'Live'];
 const EXEC_GRADES = ['10', '9', '8', '7', '6', '5', '4', '3', '2', '1'];
+const SOP_VIOLATIONS = ['Overtrading', 'Revenge Trading', 'Ignored Stop Loss', 'Wrong Session', 'No Setup Present', 'FOMO Entry', 'Position Size Error', 'Holding Through News', 'Emotional Decision', 'Other'];
 
 const styles = {
   overlay: {
@@ -594,9 +595,12 @@ export default function NewTradeModal({ isOpen, onClose, onTradeCreated }: NewTr
                   </div>
                 </div>
                 {!sopFollowed && (
-                  <div style={{ ...styles.field, ...styles.fieldFull }}>
-                    <label style={styles.label}>Violation Details</label>
-                    <textarea style={styles.textarea} value={violation} onChange={e => setViolation(e.target.value)} placeholder="What SOP rule did you violate?" />
+                  <div style={styles.field}>
+                    <label style={styles.label}>SOP Violation Type</label>
+                    <select style={styles.select} value={violation} onChange={e => setViolation(e.target.value)}>
+                      <option value="">Select violation...</option>
+                      {SOP_VIOLATIONS.map(v => <option key={v} value={v}>{v}</option>)}
+                    </select>
                   </div>
                 )}
                 <div style={{ ...styles.field, ...styles.fieldFull }}>

@@ -81,64 +81,37 @@ export async function POST(request) {
 
     const body = await request.json();
 
+    // Build properties object conditionally
+    const properties = {
+      "Trade #": {
+        title: [{ text: { content: body.name || `Trade ${new Date().toLocaleDateString()}` } }],
+      },
+      "Date": { date: { start: body.date } },
+      "Pair": { select: { name: body.pair } },
+      "Session": { select: { name: body.session } },
+      "Direction": { select: { name: body.direction } },
+      "Setup Type": { select: { name: body.setup } },
+      "HTF Bias": { select: { name: body.htfBias } },
+      "Phase": { select: { name: body.phase } },
+      "RR Planned": { number: parseFloat(body.rrPlanned) || 0 },
+      "Outcome": { select: { name: body.outcome } },
+      "PnL USD": { number: parseFloat(body.pnl) || 0 },
+      "R Multiple": { number: parseFloat(body.rMultiple) || 0 },
+      "Execution Grade": { select: { name: body.execGrade } },
+      "SOP Followed?": { select: { name: body.sopOk ? "Yes ✅" : "No ❌" } },
+      "What Worked": { rich_text: [{ text: { content: body.whatWorked || "" } }] },
+      "What To Improve": { rich_text: [{ text: { content: body.whatToImprove || "" } }] },
+      "Tags": { multi_select: (body.tags || []).map(tag => ({ name: tag })) },
+    };
+
+    // Only add SOP Violation if there's a value
+    if (body.sopViolation) {
+      properties["SOP Violation"] = { select: { name: body.sopViolation } };
+    }
+
     const page = await notion.pages.create({
       parent: { database_id: DATABASE_ID },
-      properties: {
-        "Trade #": {
-          title: [{ text: { content: body.name || `Trade ${new Date().toLocaleDateString()}` } }],
-        },
-        "Date": {
-          date: { start: body.date },
-        },
-        "Pair": {
-          select: { name: body.pair },
-        },
-        "Session": {
-          select: { name: body.session },
-        },
-        "Direction": {
-          select: { name: body.direction },
-        },
-        "Setup Type": {
-          select: { name: body.setup },
-        },
-        "HTF Bias": {
-          select: { name: body.htfBias },
-        },
-        "Phase": {
-          select: { name: body.phase },
-        },
-        "RR Planned": {
-          number: parseFloat(body.rrPlanned) || 0,
-        },
-        "Outcome": {
-          select: { name: body.outcome },
-        },
-        "PnL USD": {
-          number: parseFloat(body.pnl) || 0,
-        },
-        "R Multiple": {
-          number: parseFloat(body.rMultiple) || 0,
-        },
-        "Execution Grade": {
-          select: { name: body.execGrade },
-        },
-        "SOP Followed?": {
-          select: { name: body.sopOk ? "Yes ✅" : "No ❌" },
-        },
-        "SOP Violation": {
-          rich_text: [{ text: { content: body.sopViolation || "" } }],
-        },
-        "What Worked": {
-          rich_text: [{ text: { content: body.whatWorked || "" } }],
-        },
-        "What To Improve": {
-          rich_text: [{ text: { content: body.whatToImprove || "" } }],
-        },
-        "Tags": {
-          multi_select: (body.tags || []).map(tag => ({ name: tag })),
-        },
-      },
+      properties,
     });
 
     return Response.json({ success: true, id: page.id });
