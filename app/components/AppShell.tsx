@@ -19,7 +19,7 @@ const navItems: NavItem[] = [
   { label: 'Journal', href: '/journal', icon: 'journal' },
   { label: 'Analytics', href: '/analytics', icon: 'analytics' },
   { label: 'Calendar', href: '/calendar', icon: 'calendar' },
-  { label: 'Strategies', href: '/strategies', icon: 'strategies' },
+  { label: 'Trade Management', href: '/trade-management', icon: 'target' },
   { label: 'Tools', href: '/tools', icon: 'tools' },
   { label: 'Settings', href: '/settings', icon: 'settings' },
 ];
@@ -62,6 +62,12 @@ const Icons: Record<string, React.FC<{ className?: string; style?: React.CSSProp
     <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+    </svg>
+  ),
+  target: ({ className, style }) => (
+    <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+      <circle cx="12" cy="12" r="3" strokeWidth={2} />
     </svg>
   ),
   plus: ({ className, style }) => (
@@ -115,16 +121,14 @@ const styles = {
     letterSpacing: '0.02em',
   },
   logoIcon: {
-    width: '28px',
-    height: '28px',
+    width: '32px',
+    height: '32px',
     background: 'linear-gradient(135deg, #f0b429 0%, #f59e0b 100%)',
-    borderRadius: '8px',
+    borderRadius: '10px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: '14px',
-    fontWeight: 700,
-    color: '#0a0d12',
+    boxShadow: '0 4px 15px rgba(240, 180, 41, 0.3)',
   },
   nav: {
     flex: 1,
@@ -343,10 +347,15 @@ export default function AppShell({ children, user, onTradeCreated }: AppShellPro
         {/* Logo */}
         <div style={styles.sidebarHeader}>
           <h1 style={styles.appName}>
-            <span style={styles.logoIcon}>T</span>
-            TradeJournal Pro
+            <span style={styles.logoIcon}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0a0d12" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 3v18h18" />
+                <path d="M18 9l-5 5-2-2-4 4" />
+              </svg>
+            </span>
+            TradeVault Pro
           </h1>
-          <p style={styles.appTagline}>Professional Trading Analytics</p>
+          <p style={styles.appTagline}>ICT-Style Trading Journal & Analytics</p>
         </div>
 
         {/* Navigation */}
