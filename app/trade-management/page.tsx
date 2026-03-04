@@ -38,7 +38,14 @@ interface ChecklistItem {
   id: string;
   text: string;
   checked: boolean;
-  category: 'before' | 'during' | 'after';
+  category: 'before' | 'during' | 'after' | 'entry' | 'exit' | 'risk';
+}
+
+interface StrategyChecklist {
+  strategyId: string;
+  entryRules: { id: string; text: string; checked: boolean }[];
+  exitRules: { id: string; text: string; checked: boolean }[];
+  riskRules: { id: string; text: string; checked: boolean }[];
 }
 
 // ─── DEFAULT DATA ─────────────────────────────────────────────────────────────
@@ -519,6 +526,10 @@ export default function TradeManagementPage() {
   
   const [checklist, setChecklist] = useLocalStorage<ChecklistItem[]>('trading_checklist', DEFAULT_CHECKLIST);
   
+  // Strategy checklist state
+  const [selectedStrategyId, setSelectedStrategyId] = useLocalStorage<string>('trading_checklist_selected_strategy', '');
+  const [strategyChecklists, setStrategyChecklists] = useLocalStorage<Record<string, StrategyChecklist>>('trading_strategy_checklists', {});
+  
   const [formData, setFormData] = useState<Partial<Strategy>>({
     name: '',
     description: '',
@@ -620,6 +631,99 @@ export default function TradeManagementPage() {
     });
   };
 
+  // Get or initialize strategy checklist
+  const getStrategyChecklist = (strategyId: string): StrategyChecklist => {
+    const strategy = strategies.find((s: Strategy) => s.id === strategyId);
+    if (!strategy) return { strategyId, entryRules: [], exitRules: [], riskRules: [] };
+    
+    const existing = strategyChecklists[strategyId];
+    if (existing) return existing;
+    
+    // Initialize from strategy rules
+    const newChecklist: StrategyChecklist = {
+      strategyId,
+      entryRules: strategy.entryRules.map((text: string, i: number) => ({ 
+        id: `entry_${i}`, text, checked: false 
+      })),
+      exitRules: strategy.exitRules.map((text: string, i: number) => ({ 
+        id: `exit_${i}`, text, checked: false 
+      })),
+      riskRules: strategy.riskRules.map((text: string, i: number) => ({ 
+        id: `risk_${i}`, text, checked: false 
+      })),
+    };
+    
+    setStrategyChecklists(prev => ({ ...prev, [strategyId]: newChecklist }));
+    return newChecklist;
+  };
+
+  // Toggle strategy rule check
+  const toggleStrategyRule = (strategyId: string, ruleType: 'entry' | 'exit' | 'risk', ruleId: string) => {
+    setStrategyChecklists(prev => {
+      const current = prev[strategyId] || getStrategyChecklist(strategyId);
+      return {
+        ...prev,
+        [strategyId]: {
+          ...current,
+          [`${ruleType}Rules`]: current[`${ruleType}Rules`].map((rule: { id: string; checked: boolean }) => 
+            rule.id === ruleId ? { ...rule, checked: !rule.checked } : rule
+          )
+        }
+      };
+    });
+  };
+
+  // Calculate strategy checklist progress
+  const getStrategyProgress = (strategyId: string): { entry: number; exit: number; risk: number; overall: number } => {
+    const checklist = strategyChecklists[strategyId];
+    if (!checklist) return { entry: 0, exit: 0, risk: 0, overall: 0 };
+    
+    const entryTotal = checklist.entryRules.length;
+    const exitTotal = checklist.exitRules.length;
+    const riskTotal = checklist.riskRules.length;
+    const total = entryTotal + exitTotal + riskTotal;
+    
+    if (total === 0) return { entry: 0, exit: 0, risk: 0, overall: 0 };
+    
+    const entryChecked = checklist.entryRules.filter((r: { checked: boolean }) => r.checked).length;
+    const exitChecked = checklist.exitRules.filter((r: { checked: boolean }) => r.checked).length;
+    const riskChecked = checklist.riskRules.filter((r: { checked: boolean }) => r.checked).length;
+    const totalChecked = entryChecked + exitChecked + riskChecked;
+    
+    return {
+      entry: entryTotal > 0 ? Math.round((entryChecked / entryTotal) * 100) : 0,
+      exit: exitTotal > 0 ? Math.round((exitChecked / exitTotal) * 100) : 0,
+      risk: riskTotal > 0 ? Math.round((riskChecked / riskTotal) * 100) : 0,
+      overall: Math.round((totalChecked / total) * 100)
+    };
+  };
+
+  // Reset strategy checklist
+  const resetStrategyChecklist = (strategyId: string) => {
+    const strategy = strategies.find((s: Strategy) => s.id === strategyId);
+    if (!strategy) return;
+    
+    setStrategyChecklists(prev => ({
+      ...prev,
+      [strategyId]: {
+        strategyId,
+        entryRules: strategy.entryRules.map((text: string, i: number) => ({ 
+          id: `entry_${i}`, text, checked: false 
+        })),
+        exitRules: strategy.exitRules.map((text: string, i: number) => ({ 
+          id: `exit_${i}`, text, checked: false 
+        })),
+        riskRules: strategy.riskRules.map((text: string, i: number) => ({ 
+          id: `risk_${i}`, text, checked: false 
+        })),
+      }
+    }));
+  };
+
+  const selectedStrategy = selectedStrategyId ? strategies.find((s: Strategy) => s.id === selectedStrategyId) : null;
+  const currentStrategyChecklist = selectedStrategyId ? getStrategyChecklist(selectedStrategyId) : null;
+  const strategyProgress = selectedStrategyId ? getStrategyProgress(selectedStrategyId) : null;
+
   return (
     <AppShell user={user}>
       <div style={styles.container}>
@@ -681,18 +785,58 @@ export default function TradeManagementPage() {
         {/* CHECKLIST TAB */}
         {activeTab === 'checklist' && (
           <>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <div>
-                <h2 style={{ fontSize: '18px', fontWeight: 600, color: THEME.text.primary, margin: 0 }}>Trading Checklist</h2>
-                <p style={{ fontSize: '13px', color: THEME.text.secondary, margin: '4px 0 0 0' }}>Follow this checklist before, during, and after every trading session</p>
+            {/* Strategy Selector */}
+            <div style={{ ...styles.card, marginBottom: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' as const, gap: '16px' }}>
+                <div style={{ flex: 1, minWidth: '280px' }}>
+                  <label style={{ ...styles.label, marginBottom: '8px', display: 'block' }}>Select Strategy for Trade Checklist</label>
+                  <select 
+                    style={{ ...styles.select, width: '100%' }} 
+                    value={selectedStrategyId} 
+                    onChange={(e) => setSelectedStrategyId(e.target.value)}
+                  >
+                    <option value="">-- Choose a Strategy --</option>
+                    {strategies.map((s: Strategy) => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end' }}>
+                  <button style={styles.buttonSecondary} onClick={resetChecklist}>Reset General</button>
+                  {selectedStrategyId && (
+                    <button style={styles.buttonSecondary} onClick={() => resetStrategyChecklist(selectedStrategyId)}>Reset Strategy</button>
+                  )}
+                </div>
               </div>
-              <button style={styles.buttonSecondary} onClick={resetChecklist}>Reset All</button>
+              
+              {selectedStrategy && strategyProgress && (
+                <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: `1px solid ${THEME.border}` }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <span style={{ fontSize: '14px', fontWeight: 600, color: THEME.gold }}>{selectedStrategy.name} Progress</span>
+                    <span style={{ fontSize: '18px', fontWeight: 700, color: THEME.text.primary }}>{strategyProgress.overall}%</span>
+                  </div>
+                  <div style={styles.progressBar}>
+                    <div style={{ ...styles.progressFill, width: `${strategyProgress.overall}%`, background: THEME.gold }} />
+                  </div>
+                  <div style={{ display: 'flex', gap: '20px', marginTop: '12px' }}>
+                    <span style={{ fontSize: '12px', color: THEME.blue }}>Entry: {strategyProgress.entry}%</span>
+                    <span style={{ fontSize: '12px', color: THEME.purple }}>Exit: {strategyProgress.exit}%</span>
+                    <span style={{ fontSize: '12px', color: THEME.win }}>Risk: {strategyProgress.risk}%</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* General Trading Checklist */}
+            <div style={{ marginBottom: '20px' }}>
+              <h2 style={{ fontSize: '18px', fontWeight: 600, color: THEME.text.primary, margin: 0 }}>General Trading Checklist</h2>
+              <p style={{ fontSize: '13px', color: THEME.text.secondary, margin: '4px 0 0 0' }}>Follow this checklist before, during, and after every trading session</p>
             </div>
 
             <div style={{ ...styles.card, marginBottom: '20px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                 <span style={{ fontSize: '14px', fontWeight: 600, color: THEME.text.primary }}>Overall Progress: {totalProgress}%</span>
-                <span style={{ fontSize: '12px', color: THEME.text.muted }}>{checklist.filter(i => i.checked).length} / {checklist.length} items</span>
+                <span style={{ fontSize: '12px', color: THEME.text.muted }}>{checklist.filter((i: ChecklistItem) => i.checked).length} / {checklist.length} items</span>
               </div>
               <div style={styles.progressBar}>
                 <div style={{ ...styles.progressFill, width: `${totalProgress}%` }} />
@@ -742,6 +886,105 @@ export default function TradeManagementPage() {
                 </div>
               </div>
             </div>
+
+            {/* Strategy-Specific Rules Checklist */}
+            {selectedStrategy && currentStrategyChecklist && (
+              <>
+                <div style={{ marginTop: '32px', marginBottom: '20px' }}>
+                  <h2 style={{ fontSize: '18px', fontWeight: 600, color: THEME.text.primary, margin: 0 }}>
+                    {selectedStrategy.name} Rules Checklist
+                  </h2>
+                  <p style={{ fontSize: '13px', color: THEME.text.secondary, margin: '4px 0 0 0' }}>
+                    Verify each rule before executing this strategy • {strategyProgress?.overall || 0}% Complete
+                  </p>
+                </div>
+
+                <div style={styles.grid3}>
+                  {/* Entry Rules */}
+                  <div style={styles.checklistSection}>
+                    <div style={styles.checklistTitle}>
+                      <span style={{ color: THEME.blue }}>📥 Entry Rules</span>
+                      <span style={{ marginLeft: 'auto', fontSize: '12px', color: THEME.blue }}>{strategyProgress?.entry || 0}%</span>
+                    </div>
+                    <div style={styles.progressBar}>
+                      <div style={{ ...styles.progressFill, width: `${strategyProgress?.entry || 0}%`, background: THEME.blue }} />
+                    </div>
+                    <div style={{ marginTop: '16px' }}>
+                      {currentStrategyChecklist.entryRules.length > 0 ? (
+                        currentStrategyChecklist.entryRules.map((rule: { id: string; text: string; checked: boolean }) => (
+                          <div key={rule.id} style={{ ...styles.checklistItem, ...(rule.checked ? styles.checklistItemChecked : styles.checklistItemUnchecked) }} onClick={() => toggleStrategyRule(selectedStrategy.id, 'entry', rule.id)}>
+                            <div style={{ ...styles.checkbox, ...(rule.checked ? { ...styles.checkboxChecked, background: THEME.blue, borderColor: THEME.blue } : {}) }}>
+                              {rule.checked && <span style={{ color: '#fff', fontSize: '12px' }}>✓</span>}
+                            </div>
+                            <span style={{ ...styles.checklistText, ...(rule.checked ? styles.checklistTextChecked : {}) }}>{rule.text}</span>
+                          </div>
+                        ))
+                      ) : (
+                        <p style={{ fontSize: '13px', color: THEME.text.muted, textAlign: 'center', padding: '20px' }}>No entry rules defined</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Exit Rules */}
+                  <div style={styles.checklistSection}>
+                    <div style={styles.checklistTitle}>
+                      <span style={{ color: THEME.purple }}>📤 Exit Rules</span>
+                      <span style={{ marginLeft: 'auto', fontSize: '12px', color: THEME.purple }}>{strategyProgress?.exit || 0}%</span>
+                    </div>
+                    <div style={styles.progressBar}>
+                      <div style={{ ...styles.progressFill, width: `${strategyProgress?.exit || 0}%`, background: THEME.purple }} />
+                    </div>
+                    <div style={{ marginTop: '16px' }}>
+                      {currentStrategyChecklist.exitRules.length > 0 ? (
+                        currentStrategyChecklist.exitRules.map((rule: { id: string; text: string; checked: boolean }) => (
+                          <div key={rule.id} style={{ ...styles.checklistItem, ...(rule.checked ? styles.checklistItemChecked : styles.checklistItemUnchecked) }} onClick={() => toggleStrategyRule(selectedStrategy.id, 'exit', rule.id)}>
+                            <div style={{ ...styles.checkbox, ...(rule.checked ? { ...styles.checkboxChecked, background: THEME.purple, borderColor: THEME.purple } : {}) }}>
+                              {rule.checked && <span style={{ color: '#fff', fontSize: '12px' }}>✓</span>}
+                            </div>
+                            <span style={{ ...styles.checklistText, ...(rule.checked ? styles.checklistTextChecked : {}) }}>{rule.text}</span>
+                          </div>
+                        ))
+                      ) : (
+                        <p style={{ fontSize: '13px', color: THEME.text.muted, textAlign: 'center', padding: '20px' }}>No exit rules defined</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Risk Rules */}
+                  <div style={styles.checklistSection}>
+                    <div style={styles.checklistTitle}>
+                      <span style={{ color: THEME.win }}>🛡️ Risk Management</span>
+                      <span style={{ marginLeft: 'auto', fontSize: '12px', color: THEME.win }}>{strategyProgress?.risk || 0}%</span>
+                    </div>
+                    <div style={styles.progressBar}>
+                      <div style={{ ...styles.progressFill, width: `${strategyProgress?.risk || 0}%`, background: THEME.win }} />
+                    </div>
+                    <div style={{ marginTop: '16px' }}>
+                      {currentStrategyChecklist.riskRules.length > 0 ? (
+                        currentStrategyChecklist.riskRules.map((rule: { id: string; text: string; checked: boolean }) => (
+                          <div key={rule.id} style={{ ...styles.checklistItem, ...(rule.checked ? styles.checklistItemChecked : styles.checklistItemUnchecked) }} onClick={() => toggleStrategyRule(selectedStrategy.id, 'risk', rule.id)}>
+                            <div style={{ ...styles.checkbox, ...(rule.checked ? { ...styles.checkboxChecked, background: THEME.win, borderColor: THEME.win } : {}) }}>
+                              {rule.checked && <span style={{ color: '#fff', fontSize: '12px' }}>✓</span>}
+                            </div>
+                            <span style={{ ...styles.checklistText, ...(rule.checked ? styles.checklistTextChecked : {}) }}>{rule.text}</span>
+                          </div>
+                        ))
+                      ) : (
+                        <p style={{ fontSize: '13px', color: THEME.text.muted, textAlign: 'center', padding: '20px' }}>No risk rules defined</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {!selectedStrategy && (
+              <div style={{ ...styles.card, marginTop: '32px', textAlign: 'center', padding: '40px' }}>
+                <p style={{ fontSize: '16px', color: THEME.text.secondary, margin: 0 }}>
+                  Select a strategy above to see its specific entry, exit, and risk management rules
+                </p>
+              </div>
+            )}
           </>
         )}
 
