@@ -116,7 +116,20 @@ export async function fetchTradesFromNotion(): Promise<Trade[]> {
       throw new Error('Invalid response format from API');
     }
 
-    return data.trades.map(transformNotionTrade);
+    // Log for debugging
+    if (data.trades.length > 0) {
+      console.log(`[Analytics] Loaded ${data.trades.length} trades from API`);
+      console.log('[Analytics] Sample trade:', data.trades[0]);
+    }
+
+    const transformed = data.trades.map(transformNotionTrade);
+    
+    // Log transformed data
+    if (transformed.length > 0) {
+      console.log('[Analytics] Sample transformed:', transformed[0]);
+    }
+    
+    return transformed;
   } catch (error) {
     console.error('Error fetching trades from Notion:', error);
     throw error;
