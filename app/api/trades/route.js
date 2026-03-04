@@ -36,11 +36,15 @@ export async function GET(request) {
       const msel   = (k) => p[k]?.multi_select?.map(s => s.name) || [];
       const url    = (k) => p[k]?.url || "";
 
+      // Try alternative property names for PnL and R Multiple
+      const pnlValue = num("PnL USD") || num("P&L USD") || num("PnL") || num("Profit/Loss") || 0;
+      const rMultValue = num("R Multiple") || num("R-Multiple") || num("R") || num("R-Mult") || 0;
+
       // Debug first trade
       if (allResults.indexOf(page) === 0) {
         console.log('[API] First trade properties:', Object.keys(p));
-        console.log('[API] PnL USD value:', p["PnL USD"]);
-        console.log('[API] R Multiple value:', p["R Multiple"]);
+        console.log('[API] PnL value:', pnlValue, '| Raw:', p["PnL USD"]);
+        console.log('[API] R Multiple value:', rMultValue, '| Raw:', p["R Multiple"]);
       }
 
       return {
@@ -55,8 +59,8 @@ export async function GET(request) {
         phase:        sel("Phase"),
         rrPlanned:    num("RR Planned"),
         outcome:      sel("Outcome"),
-        pnl:          num("PnL USD"),
-        rMultiple:    num("R Multiple"),
+        pnl:          pnlValue,
+        rMultiple:    rMultValue,
         execGrade:    sel("Execution Grade"),
         sopOk:        sel("SOP Followed?") === "Yes ✅",
         sopViolation: sel("SOP Violation"),
