@@ -36,6 +36,13 @@ export async function GET(request) {
       const msel   = (k) => p[k]?.multi_select?.map(s => s.name) || [];
       const url    = (k) => p[k]?.url || "";
 
+      // Debug first trade
+      if (allResults.indexOf(page) === 0) {
+        console.log('[API] First trade properties:', Object.keys(p));
+        console.log('[API] PnL USD value:', p["PnL USD"]);
+        console.log('[API] R Multiple value:', p["R Multiple"]);
+      }
+
       return {
         id:           page.id,
         name:         title("Trade #"),

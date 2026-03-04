@@ -12,7 +12,7 @@
  * - Psychology: Streaks, R-multiples, behavioral metrics
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, AreaChart, Area, LineChart, Line, ComposedChart,
@@ -574,6 +574,26 @@ export default function AnalyticsPage() {
       instrument: t.instrument,
     }));
   }, [trades]);
+
+  // Debug: Log data issues
+  useEffect(() => {
+    if (trades.length > 0) {
+      console.log('[Analytics] Total trades:', trades.length);
+      console.log('[Analytics] First trade:', trades[0]);
+      console.log('[Analytics] Sample PnL values:', trades.slice(0, 5).map(t => ({ 
+        id: t.id, 
+        pnl: t.pnlCurrency, 
+        pnlR: t.pnlR, 
+        outcome: t.outcome 
+      })));
+      
+      // Check for zero values
+      const zeroPnL = trades.filter(t => t.pnlCurrency === 0).length;
+      const zeroPnLR = trades.filter(t => t.pnlR === 0).length;
+      if (zeroPnL > 0) console.warn(`[Analytics] ${zeroPnL} trades have zero PnL`);
+      if (zeroPnLR > 0) console.warn(`[Analytics] ${zeroPnLR} trades have zero PnL R`);
+    }
+  }, [trades]);
   
   // Loading state
   if (isLoading && trades.length === 0) {
@@ -622,6 +642,25 @@ export default function AnalyticsPage() {
           <p style={styles.demoText}>Demo Mode: Using sample data. Connect Notion for real data.</p>
         </div>
       )}
+
+      {/* Data Source Info */}
+      <div style={{ 
+        background: 'rgba(59, 130, 246, 0.1)', 
+        border: '1px solid rgba(59, 130, 246, 0.3)', 
+        borderRadius: '12px', 
+        padding: '12px 16px', 
+        marginBottom: '20px',
+        fontSize: '12px',
+        color: '#6b7280'
+      }}>
+        <strong>Data Source:</strong> {apiTrades.length > 0 ? 'Notion API' : 'Mock Data'} | 
+        <strong> Trades:</strong> {trades.length} | 
+        <strong> Loading:</strong> {isLoading ? 'Yes' : 'No'} | 
+        <strong> Sample PnL:</strong> {trades[0]?.pnlCurrency !== undefined ? formatCurrency(trades[0].pnlCurrency) : 'N/A'}
+        {trades.length > 0 && trades[0].pnlCurrency === 0 && (
+          <span style={{ color: '#ef4444', marginLeft: '10px' }}>⚠️ Trades have zero PnL values</span>
+        )}
+      </div>
       
       {/* Navigation Tabs */}
       <div style={styles.tabs}>
