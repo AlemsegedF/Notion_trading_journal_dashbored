@@ -423,7 +423,26 @@ export default function SettingsPage() {
             <span style={styles.infoLabel}>Export</span>
             <button
               style={{ ...styles.saveButton, fontSize: '12px', padding: '8px 14px' }}
-              onClick={() => alert('Export feature coming soon!')}
+              onClick={() => {
+                const data = {
+                  settings: typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('user_settings') || '{}') : {},
+                  strategies: typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('trading_strategies') || '[]') : [],
+                  checklist: typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('trading_checklist') || '[]') : [],
+                  strategyChecklists: typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('trading_strategy_checklists') || '{}') : {},
+                  exportDate: new Date().toISOString(),
+                  version: '1.0'
+                };
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `trading-journal-export-${new Date().toISOString().split('T')[0]}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                alert('Data exported successfully!');
+              }}
             >
               Export Data
             </button>

@@ -514,6 +514,445 @@ const styles: Record<string, React.CSSProperties> = {
   }
 };
 
+// ─── TRADE PLAN TAB COMPONENT ─────────────────────────────────────────────────
+
+interface TradePlanData {
+  pair: string;
+  strategyId: string;
+  direction: 'LONG' | 'SHORT';
+  session: string;
+  accountSize: number;
+  riskPercent: number;
+  entryPrice: number;
+  stopLoss: number;
+  takeProfit: number;
+  notes: string;
+  confirmations: {
+    htfBias: boolean;
+    setupPresent: boolean;
+    riskReward: boolean;
+    noNews: boolean;
+    sessionTime: boolean;
+    mentalState: boolean;
+  };
+}
+
+function TradePlanTab({ strategies }: { strategies: Strategy[] }) {
+  const [savedPlans, setSavedPlans] = useLocalStorage<TradePlanData[]>('trade_plans', []);
+  const [showHistory, setShowHistory] = useState(false);
+  
+  const [plan, setPlan] = useState<TradePlanData>({
+    pair: '',
+    strategyId: '',
+    direction: 'LONG',
+    session: 'London',
+    accountSize: 50000,
+    riskPercent: 1,
+    entryPrice: 0,
+    stopLoss: 0,
+    takeProfit: 0,
+    notes: '',
+    confirmations: {
+      htfBias: false,
+      setupPresent: false,
+      riskReward: false,
+      noNews: false,
+      sessionTime: false,
+      mentalState: false
+    }
+  });
+
+  // Auto-calculate position size and risk metrics
+  const riskAmount = plan.accountSize * (plan.riskPercent / 100);
+  const stopDistance = plan.direction === 'LONG' 
+    ? plan.entryPrice - plan.stopLoss 
+    : plan.stopLoss - plan.entryPrice;
+  const positionSize = stopDistance > 0 ? riskAmount / stopDistance : 0;
+  const riskReward = stopDistance > 0 
+    ? Math.abs(plan.takeProfit - plan.entryPrice) / stopDistance 
+    : 0;
+  const potentialProfit = riskAmount * riskReward;
+  
+  const confirmationProgress = Object.values(plan.confirmations).filter(Boolean).length / 6 * 100;
+
+  const handleSavePlan = () => {
+    if (!plan.pair || !plan.strategyId || !plan.entryPrice || !plan.stopLoss) {
+      alert('Please fill in all required fields (Pair, Strategy, Entry, Stop Loss)');
+      return;
+    }
+    setSavedPlans(prev => [plan, ...prev]);
+    alert('Trade plan saved successfully!');
+  };
+
+  const handleReset = () => {
+    setPlan({
+      pair: '',
+      strategyId: '',
+      direction: 'LONG',
+      session: 'London',
+      accountSize: 50000,
+      riskPercent: 1,
+      entryPrice: 0,
+      stopLoss: 0,
+      takeProfit: 0,
+      notes: '',
+      confirmations: {
+        htfBias: false,
+        setupPresent: false,
+        riskReward: false,
+        noNews: false,
+        sessionTime: false,
+        mentalState: false
+      }
+    });
+  };
+
+  const selectedStrategy = strategies.find((s: Strategy) => s.id === plan.strategyId);
+
+  return (
+    <>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <div>
+          <h2 style={{ fontSize: '18px', fontWeight: 600, color: THEME.text.primary, margin: 0 }}>Trade Planning Worksheet</h2>
+          <p style={{ fontSize: '13px', color: THEME.text.secondary, margin: '4px 0 0 0' }}>Plan your trade before executing. If it is not on paper, it does not exist.</p>
+        </div>
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <button style={styles.buttonSecondary} onClick={() => setShowHistory(!showHistory)}>
+            {showHistory ? 'Hide History' : `View History (${savedPlans.length})`}
+          </button>
+          <button style={styles.buttonSecondary} onClick={handleReset}>Reset Form</button>
+        </div>
+      </div>
+
+      {/* Saved Plans History */}
+      {showHistory && savedPlans.length > 0 && (
+        <div style={{ ...styles.card, marginBottom: '20px', maxHeight: '300px', overflow: 'auto' }}>
+          <div style={styles.cardTitle}>Saved Trade Plans</div>
+          {savedPlans.map((savedPlan: TradePlanData, index: number) => (
+            <div key={index} style={{ 
+              padding: '12px', 
+              borderBottom: index < savedPlans.length - 1 ? `1px solid ${THEME.border}` : 'none',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <div>
+                <span style={{ fontWeight: 600, color: THEME.text.primary }}>{savedPlan.pair}</span>
+                <span style={{ marginLeft: '12px', color: savedPlan.direction === 'LONG' ? THEME.win : THEME.loss }}>
+                  {savedPlan.direction}
+                </span>
+                <span style={{ marginLeft: '12px', fontSize: '12px', color: THEME.text.muted }}>
+                  {strategies.find((s: Strategy) => s.id === savedPlan.strategyId)?.name || 'Unknown Strategy'}
+                </span>
+              </div>
+              <button 
+                style={{ ...styles.buttonSecondary, padding: '6px 12px', fontSize: '12px' }}
+                onClick={() => setPlan(savedPlan)}
+              >
+                Load
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Quick Stats Bar */}
+      <div style={{ ...styles.card, marginBottom: '20px', display: 'flex', gap: '24px', flexWrap: 'wrap' as const }}>
+        <div>
+          <div style={{ fontSize: '11px', color: THEME.text.muted, textTransform: 'uppercase' }}>Risk Amount</div>
+          <div style={{ fontSize: '18px', fontWeight: 700, color: THEME.loss }}>${riskAmount.toFixed(2)}</div>
+        </div>
+        <div>
+          <div style={{ fontSize: '11px', color: THEME.text.muted, textTransform: 'uppercase' }}>Position Size</div>
+          <div style={{ fontSize: '18px', fontWeight: 700, color: THEME.text.primary }}>
+            {positionSize > 0 ? positionSize.toFixed(4) : '--'}
+          </div>
+        </div>
+        <div>
+          <div style={{ fontSize: '11px', color: THEME.text.muted, textTransform: 'uppercase' }}>Risk:Reward</div>
+          <div style={{ fontSize: '18px', fontWeight: 700, color: riskReward >= 2 ? THEME.win : THEME.gold }}>
+            {riskReward > 0 ? `1:${riskReward.toFixed(2)}` : '--'}
+          </div>
+        </div>
+        <div>
+          <div style={{ fontSize: '11px', color: THEME.text.muted, textTransform: 'uppercase' }}>Potential Profit</div>
+          <div style={{ fontSize: '18px', fontWeight: 700, color: THEME.win }}>${potentialProfit.toFixed(2)}</div>
+        </div>
+        <div>
+          <div style={{ fontSize: '11px', color: THEME.text.muted, textTransform: 'uppercase' }}>Confirmation</div>
+          <div style={{ fontSize: '18px', fontWeight: 700, color: confirmationProgress >= 80 ? THEME.win : THEME.gold }}>
+            {confirmationProgress.toFixed(0)}%
+          </div>
+        </div>
+      </div>
+
+      <div style={styles.grid2}>
+        {/* Pre-Trade Analysis */}
+        <div style={styles.card}>
+          <div style={styles.cardTitle}>Pre-Trade Analysis</div>
+          <div style={styles.form}>
+            <div style={styles.field}>
+              <label style={styles.label}>Pair / Instrument *</label>
+              <select 
+                style={styles.select} 
+                value={plan.pair}
+                onChange={(e) => setPlan({ ...plan, pair: e.target.value })}
+              >
+                <option value="">Select pair...</option>
+                <option value="EUR/USD">EUR/USD</option>
+                <option value="GBP/USD">GBP/USD</option>
+                <option value="USD/JPY">USD/JPY</option>
+                <option value="GBP/JPY">GBP/JPY</option>
+                <option value="XAU/USD">XAU/USD</option>
+                <option value="US30">US30</option>
+                <option value="ETH/USD">ETH/USD</option>
+                <option value="BTC/USD">BTC/USD</option>
+              </select>
+            </div>
+            <div style={styles.field}>
+              <label style={styles.label}>Strategy *</label>
+              <select 
+                style={styles.select}
+                value={plan.strategyId}
+                onChange={(e) => setPlan({ ...plan, strategyId: e.target.value })}
+              >
+                <option value="">Select strategy...</option>
+                {strategies.map((s: Strategy) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </div>
+            {selectedStrategy && (
+              <div style={{ 
+                padding: '12px', 
+                background: 'rgba(240, 180, 41, 0.1)', 
+                borderRadius: '8px',
+                fontSize: '12px',
+                color: THEME.text.secondary
+              }}>
+                <strong style={{ color: THEME.gold }}>{selectedStrategy.timeframe}</strong> • {selectedStrategy.bestPairs.join(', ')}
+              </div>
+            )}
+            <div style={styles.grid2}>
+              <div style={styles.field}>
+                <label style={styles.label}>Direction</label>
+                <select 
+                  style={styles.select}
+                  value={plan.direction}
+                  onChange={(e) => setPlan({ ...plan, direction: e.target.value as 'LONG' | 'SHORT' })}
+                >
+                  <option value="LONG">Long</option>
+                  <option value="SHORT">Short</option>
+                </select>
+              </div>
+              <div style={styles.field}>
+                <label style={styles.label}>Session</label>
+                <select 
+                  style={styles.select}
+                  value={plan.session}
+                  onChange={(e) => setPlan({ ...plan, session: e.target.value })}
+                >
+                  <option>London</option>
+                  <option>New York</option>
+                  <option>Asia</option>
+                  <option>Overlap</option>
+                </select>
+              </div>
+            </div>
+            <div style={styles.field}>
+              <label style={styles.label}>Trade Notes</label>
+              <textarea 
+                style={{ ...styles.textarea, minHeight: '80px' }}
+                value={plan.notes}
+                onChange={(e) => setPlan({ ...plan, notes: e.target.value })}
+                placeholder="Setup description, HTF bias, key levels..."
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Risk Management */}
+        <div style={styles.card}>
+          <div style={styles.cardTitle}>Risk Management</div>
+          <div style={styles.form}>
+            <div style={styles.grid2}>
+              <div style={styles.field}>
+                <label style={styles.label}>Account Size ($)</label>
+                <input 
+                  type="number" 
+                  style={styles.input} 
+                  value={plan.accountSize || ''}
+                  onChange={(e) => setPlan({ ...plan, accountSize: parseFloat(e.target.value) || 0 })}
+                />
+              </div>
+              <div style={styles.field}>
+                <label style={styles.label}>Risk %</label>
+                <select 
+                  style={styles.select}
+                  value={plan.riskPercent}
+                  onChange={(e) => setPlan({ ...plan, riskPercent: parseFloat(e.target.value) })}
+                >
+                  <option value={0.5}>0.5%</option>
+                  <option value={1}>1.0%</option>
+                  <option value={1.5}>1.5%</option>
+                  <option value={2}>2.0%</option>
+                </select>
+              </div>
+            </div>
+            <div style={styles.grid2}>
+              <div style={styles.field}>
+                <label style={styles.label}>Entry Price *</label>
+                <input 
+                  type="number" 
+                  style={styles.input} 
+                  value={plan.entryPrice || ''}
+                  onChange={(e) => setPlan({ ...plan, entryPrice: parseFloat(e.target.value) || 0 })}
+                  step="0.00001"
+                />
+              </div>
+              <div style={styles.field}>
+                <label style={styles.label}>Stop Loss *</label>
+                <input 
+                  type="number" 
+                  style={styles.input} 
+                  value={plan.stopLoss || ''}
+                  onChange={(e) => setPlan({ ...plan, stopLoss: parseFloat(e.target.value) || 0 })}
+                  step="0.00001"
+                />
+              </div>
+            </div>
+            <div style={styles.grid2}>
+              <div style={styles.field}>
+                <label style={styles.label}>Take Profit</label>
+                <input 
+                  type="number" 
+                  style={styles.input} 
+                  value={plan.takeProfit || ''}
+                  onChange={(e) => setPlan({ ...plan, takeProfit: parseFloat(e.target.value) || 0 })}
+                  step="0.00001"
+                />
+              </div>
+              <div style={styles.field}>
+                <label style={styles.label}>Position Size (Lots)</label>
+                <input 
+                  type="text" 
+                  style={{ ...styles.input, background: 'rgba(240, 180, 41, 0.1)', fontWeight: 600 }}
+                  value={positionSize > 0 ? positionSize.toFixed(4) : '---'}
+                  readOnly 
+                />
+              </div>
+            </div>
+            {stopDistance <= 0 && plan.entryPrice > 0 && plan.stopLoss > 0 && (
+              <div style={{ color: THEME.loss, fontSize: '12px' }}>
+                ⚠️ Stop loss must be {plan.direction === 'LONG' ? 'below' : 'above'} entry for {plan.direction === 'LONG' ? 'Long' : 'Short'} trades
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Setup Confirmation */}
+        <div style={{ ...styles.card, ...{ gridColumn: 'span 2' } }}>
+          <div style={styles.cardTitle}>Setup Confirmation Checklist</div>
+          <div style={styles.grid3}>
+            {[
+              { key: 'htfBias', label: 'HTF bias aligned' },
+              { key: 'setupPresent', label: 'Clear setup present' },
+              { key: 'riskReward', label: `Risk:Reward ${riskReward >= 2 ? '≥' : '<'} 1:2` },
+              { key: 'noNews', label: 'No high-impact news' },
+              { key: 'sessionTime', label: 'Within session time' },
+              { key: 'mentalState', label: 'Mental state good' },
+            ].map(({ key, label }) => (
+              <label 
+                key={key} 
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '10px', 
+                  cursor: 'pointer', 
+                  fontSize: '14px', 
+                  color: plan.confirmations[key as keyof typeof plan.confirmations] ? THEME.text.primary : THEME.text.secondary,
+                  padding: '10px',
+                  borderRadius: '8px',
+                  background: plan.confirmations[key as keyof typeof plan.confirmations] ? 'rgba(34, 197, 94, 0.1)' : 'transparent',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <div style={{
+                  width: '20px',
+                  height: '20px',
+                  borderRadius: '5px',
+                  border: `2px solid ${plan.confirmations[key as keyof typeof plan.confirmations] ? THEME.win : THEME.border}`,
+                  background: plan.confirmations[key as keyof typeof plan.confirmations] ? THEME.win : 'transparent',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  {plan.confirmations[key as keyof typeof plan.confirmations] && <span style={{ color: '#fff', fontSize: '12px' }}>✓</span>}
+                </div>
+                <input 
+                  type="checkbox" 
+                  style={{ display: 'none' }}
+                  checked={plan.confirmations[key as keyof typeof plan.confirmations]}
+                  onChange={(e) => setPlan({ 
+                    ...plan, 
+                    confirmations: { ...plan.confirmations, [key]: e.target.checked }
+                  })}
+                />
+                {label}
+              </label>
+            ))}
+          </div>
+          
+          {/* Progress Bar */}
+          <div style={{ marginTop: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <span style={{ fontSize: '12px', color: THEME.text.secondary }}>Checklist Progress</span>
+              <span style={{ fontSize: '12px', color: confirmationProgress >= 80 ? THEME.win : THEME.gold }}>{confirmationProgress.toFixed(0)}%</span>
+            </div>
+            <div style={styles.progressBar}>
+              <div style={{ 
+                ...styles.progressFill, 
+                width: `${confirmationProgress}%`,
+                background: confirmationProgress >= 80 ? THEME.win : THEME.gold
+              }} />
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
+            <button 
+              style={{ ...styles.button, flex: 1, justifyContent: 'center' }}
+              onClick={handleSavePlan}
+            >
+              Save Trade Plan
+            </button>
+            <button 
+              style={{ ...styles.buttonSecondary, flex: 1 }}
+              onClick={() => {
+                const text = `TRADE PLAN
+Pair: ${plan.pair}
+Direction: ${plan.direction}
+Strategy: ${selectedStrategy?.name || 'None'}
+Entry: ${plan.entryPrice}
+Stop: ${plan.stopLoss}
+Target: ${plan.takeProfit}
+Position Size: ${positionSize.toFixed(4)} lots
+Risk: $${riskAmount.toFixed(2)} (${plan.riskPercent}%)
+R:R: 1:${riskReward.toFixed(2)}
+Confirmation: ${confirmationProgress.toFixed(0)}%
+
+Notes:
+${plan.notes}`;
+                navigator.clipboard.writeText(text);
+                alert('Trade plan copied to clipboard!');
+              }}
+            >
+              Copy to Clipboard
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
 // ─── COMPONENT ────────────────────────────────────────────────────────────────
 
 export default function TradeManagementPage() {
@@ -990,124 +1429,7 @@ export default function TradeManagementPage() {
 
         {/* TRADE PLAN TAB */}
         {activeTab === 'plan' && (
-          <>
-            <div style={{ marginBottom: '20px' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: 600, color: THEME.text.primary, margin: 0 }}>Trade Planning Worksheet</h2>
-              <p style={{ fontSize: '13px', color: THEME.text.secondary, margin: '4px 0 0 0' }}>Plan your trade before executing. If it is not on paper, it does not exist.</p>
-            </div>
-
-            <div style={styles.grid2}>
-              <div style={styles.card}>
-                <div style={styles.cardTitle}>Pre-Trade Analysis</div>
-                <div style={styles.form}>
-                  <div style={styles.field}>
-                    <label style={styles.label}>Pair / Instrument</label>
-                    <select style={styles.select}>
-                      <option>Select pair...</option>
-                      <option>EUR/USD</option>
-                      <option>GBP/USD</option>
-                      <option>USD/JPY</option>
-                      <option>XAU/USD</option>
-                      <option>US30</option>
-                    </select>
-                  </div>
-                  <div style={styles.field}>
-                    <label style={styles.label}>Strategy</label>
-                    <select style={styles.select}>
-                      <option>Select strategy...</option>
-                      {strategies.map((s: Strategy) => <option key={s.id}>{s.name}</option>)}
-                    </select>
-                  </div>
-                  <div style={styles.grid2}>
-                    <div style={styles.field}>
-                      <label style={styles.label}>Direction</label>
-                      <select style={styles.select}>
-                        <option>Long</option>
-                        <option>Short</option>
-                      </select>
-                    </div>
-                    <div style={styles.field}>
-                      <label style={styles.label}>Session</label>
-                      <select style={styles.select}>
-                        <option>London</option>
-                        <option>New York</option>
-                        <option>Asia</option>
-                        <option>Overlap</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div style={styles.card}>
-                <div style={styles.cardTitle}>Risk Management</div>
-                <div style={styles.form}>
-                  <div style={styles.grid2}>
-                    <div style={styles.field}>
-                      <label style={styles.label}>Account Size ($)</label>
-                      <input type="number" style={styles.input} placeholder="50000" />
-                    </div>
-                    <div style={styles.field}>
-                      <label style={styles.label}>Risk %</label>
-                      <select style={styles.select}>
-                        <option>0.5%</option>
-                        <option>1.0%</option>
-                        <option>1.5%</option>
-                        <option>2.0%</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div style={styles.grid2}>
-                    <div style={styles.field}>
-                      <label style={styles.label}>Entry Price</label>
-                      <input type="number" style={styles.input} placeholder="1.0850" step="0.0001" />
-                    </div>
-                    <div style={styles.field}>
-                      <label style={styles.label}>Stop Loss</label>
-                      <input type="number" style={styles.input} placeholder="1.0820" step="0.0001" />
-                    </div>
-                  </div>
-                  <div style={styles.grid2}>
-                    <div style={styles.field}>
-                      <label style={styles.label}>Take Profit</label>
-                      <input type="number" style={styles.input} placeholder="1.0920" step="0.0001" />
-                    </div>
-                    <div style={styles.field}>
-                      <label style={styles.label}>Position Size</label>
-                      <input type="text" style={styles.input} placeholder="Auto-calculated" readOnly />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ ...styles.card, ...{ gridColumn: 'span 2' } }}>
-                <div style={styles.cardTitle}>Setup Confirmation</div>
-                <div style={styles.grid3}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: THEME.text.secondary }}>
-                    <input type="checkbox" /> HTF bias aligned
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: THEME.text.secondary }}>
-                    <input type="checkbox" /> Clear setup present
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: THEME.text.secondary }}>
-                    <input type="checkbox" /> Risk:Reward 1:2
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: THEME.text.secondary }}>
-                    <input type="checkbox" /> No high-impact news
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: THEME.text.secondary }}>
-                    <input type="checkbox" /> Within session time
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: THEME.text.secondary }}>
-                    <input type="checkbox" /> Mental state good
-                  </label>
-                </div>
-                <button style={{ ...styles.button, marginTop: '20px', width: '100%', justifyContent: 'center' }}>
-                  Save Trade Plan
-                </button>
-              </div>
-            </div>
-          </>
+          <TradePlanTab strategies={strategies} />
         )}
 
         {/* STRATEGY MODAL */}
